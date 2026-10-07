@@ -1,0 +1,16 @@
+{
+  "metadata": "data/metadata/metadata.csv",
+  "electricity": "data/meters/raw/electricity.csv",
+  "weather": "data/weather/weather.csv",
+  "output": "outputs",
+  "building": "Hog_office_Miriam",
+  "start": "2016-01-01 00:00:00",
+  "end": "2017-12-31 23:00:00",
+  "weather_mode": "retrospective",
+  "max_gap": 3,
+  "seed": 42,
+  "capacity": 100,
+  "daily_variation": 0.12,
+  "weekend_fraction": 0.04,
+  "thermal": {"resistance_k_per_kw": 2.0, "capacity_kwh_per_k": 40.0, "initial_c": 21.0, "heating_c": 20.0, "cooling_c": 25.0, "hvac_kw": 30.0, "person_kw": 0.1, "base_gain_kw": 2.0}
+}
