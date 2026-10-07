@@ -16,49 +16,26 @@ source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-`data/` est exclu de Git : il faut télécharger les trois CSV du
-[dépôt BDG2](https://github.com/buds-lab/building-data-genome-project-2).
-Ils sont stockés avec **Git LFS** : un clone classique sans LFS peut ne récupérer
-que des fichiers pointeurs, inutilisables par le pipeline.
-
-Installer [Git LFS](https://git-lfs.com/) si nécessaire (`sudo apt install git-lfs`
-sous Ubuntu/Debian). Depuis la racine de **ce projet**, exécuter :
+Les données ne sont pas incluses dans ce dépôt. Installer [Git LFS](https://git-lfs.com/)
+(`sudo apt install git-lfs` sous Ubuntu/Debian), puis télécharger les trois CSV
+BDG2 depuis la racine du projet :
 
 ```bash
-# Cloner la source à côté du projet, sans télécharger tous les CSV.
 GIT_LFS_SKIP_SMUDGE=1 git clone --depth 1 \
   https://github.com/buds-lab/building-data-genome-project-2.git ../bdg2-source
-
-# Télécharger seulement les trois fichiers nécessaires.
 git -C ../bdg2-source lfs install --local
 git -C ../bdg2-source lfs pull \
   --include="data/metadata/metadata.csv,data/meters/raw/electricity.csv,data/weather/weather.csv" \
   --exclude=""
 
-# Copier les fichiers vers les chemins attendus, sans écraser ceux déjà présents.
 mkdir -p data/metadata data/meters/raw data/weather
-cp -n ../bdg2-source/data/metadata/metadata.csv data/metadata/metadata.csv
-cp -n ../bdg2-source/data/meters/raw/electricity.csv data/meters/raw/electricity.csv
-cp -n ../bdg2-source/data/weather/weather.csv data/weather/weather.csv
+cp -n ../bdg2-source/data/metadata/metadata.csv data/metadata/
+cp -n ../bdg2-source/data/meters/raw/electricity.csv data/meters/raw/
+cp -n ../bdg2-source/data/weather/weather.csv data/weather/
 ```
 
-Si `../bdg2-source` existe déjà, réutiliser ce dossier sans refaire le clone.
-Les téléchargements représentent environ 190 Mo. Vérifier ensuite :
-
-```bash
-ls -lh data/metadata/metadata.csv data/meters/raw/electricity.csv data/weather/weather.csv
-head -n 1 data/meters/raw/electricity.csv
-```
-
-La première ligne électrique doit commencer par `timestamp,`, et non par
-`version https://git-lfs.github.com/spec/v1`. Si elle contient ce dernier texte,
-le téléchargement LFS n’est pas terminé : refaire `git lfs pull` dans le dépôt
-source, puis recopier le fichier concerné en retirant `-n` de sa commande `cp`.
-Les fichiers sont maintenant prêts pour l’étape 2.
-
-Utiliser la consommation **raw**, sans la remplacer par la version nettoyée.
-[config.json](config.json) centralise les chemins, la période et les paramètres.
-Tous les chemins sont relatifs à la racine depuis laquelle les commandes sont lancées.
+Si `../bdg2-source` existe déjà, sauter la commande de clone.
+Les chemins et paramètres sont définis dans [config.json](config.json).
 
 ## 2. Préparer et vérifier les exports
 
