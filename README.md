@@ -155,11 +155,34 @@ L’historique du bâtiment est mis à jour par upsert.
 Pour signaler un problème, partager la commande et le statut/code d’erreur,
 jamais le contenu de `.env`. [Référence des erreurs API Supabase](https://supabase.com/docs/guides/api/rest/postgrest-error-codes).
 
+## Évaluer la baseline
+
+Après `prepare`, lancer :
+
+```bash
+python -m twin baseline
+```
+
+La règle est simple : **consommation prévue = consommation mesurée une heure avant**.
+Aucun entraînement n’est nécessaire. La consommation de l’heure cible sert uniquement à mesurer l’erreur.
+
+La période par défaut est juillet–décembre 2017, configurable dans
+`baseline_evaluation` de `config.json`. L’évaluation avance heure par heure :
+les mesures précédentes deviennent disponibles après chaque observation, y compris
+celles de la période de test. C’est une prévision à une heure, pas une prévision
+de six mois faite en une seule fois.
+
+`outputs/baselines/` contient `predictions.csv` et `metrics.json` : MAE, RMSE
+et biais en kWh, calculés sur les heures où mesure et prévision sont finies.
+Les trous et valeurs non finies sont signalés et exclus du calcul, sans modifier
+les mesures originales. Ces résultats serviront à comparer les futurs modèles IA ;
+ils ne déclenchent pas d’alertes et ne sont pas chargés dans Supabase.
+
 ## Repères pour contribuer
 
 `twin/__main__.py` reçoit les commandes ; `data.py` charge et valide,
 `pipeline.py` prépare et diagnostique, `simulation.py` simule, `export.py` exporte
-et charge. Le schéma est dans `sql/`, les tests dans `tests/`, les détails dans
+et charge. `baselines.py` évalue les prévisions de référence. Le schéma est dans `sql/`, les tests dans `tests/`, les détails dans
 [docs/methodologie.md](docs/methodologie.md) et [docs/validation.md](docs/validation.md).
 Après une modification de code, lancer les tests et régénérer les exports destinés à l’ingestion.
 
