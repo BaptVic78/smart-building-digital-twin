@@ -27,7 +27,10 @@ st.markdown(
         box-shadow: 0 3px 12px rgba(18, 56, 48, 0.05);
     }
     [data-testid="stMetricLabel"] {
-        color: #58716a;
+        color: #58716a !important;
+    }
+    [data-testid="stMetricValue"] {
+        color: #173c34 !important;
     }
     h1, h2, h3 {
         color: #173c34;
@@ -143,6 +146,7 @@ def render_overview(data: DashboardData, building_id: str, run_id: str):
             if scatter.empty:
                 st.info("Pas assez de données météo pour afficher cette relation.")
             else:
+                scatter = scatter.iloc[:: max(1, len(scatter) // 500)]
                 st.scatter_chart(
                     scatter,
                     x="outdoor_temperature_processed_c",
@@ -279,8 +283,16 @@ def main():
         ["Vue d’ensemble", "Suivi (flux non connecté)"],
     )
 
+    @st.cache_data(ttl=60)
+    def cached_dashboard_data(config_path):
+        return load_dashboard_data(config_path)
+
+    if st.sidebar.button("Actualiser les exports"):
+        cached_dashboard_data.clear()
+        st.rerun()
+
     try:
-        data = load_dashboard_data(ROOT / "config.json")
+        data = cached_dashboard_data(ROOT / "config.json")
     except FileNotFoundError as error:
         st.title("Jumeau énergétique")
         st.info(
@@ -291,7 +303,7 @@ def main():
         if page == "Suivi (flux non connecté)":
             st.warning("Le suivi en direct sera activé lorsqu’une source de flux sera configurée.")
         return
-    except (ValueError, KeyError, json.JSONDecodeError) as error:
+    except (OSError, ValueError, KeyError, json.JSONDecodeError) as error:
         st.error(f"Impossible de charger les exports : {error}")
         return
 

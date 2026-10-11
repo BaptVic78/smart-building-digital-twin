@@ -23,7 +23,7 @@ def supabase_headers(secret, method):
         'Range': '0-0',
     }
     if not secret.startswith('sb_secret_'):
-        headers['Authorization'] = f'Bearer {secret}'
+        headers['Authorization'] = 'Bearer ' + secret
     return headers
 
 
