@@ -58,14 +58,38 @@ python -m twin diagnose                    # Optionnel
 python -m unittest discover -s tests -v
 ```
 
-## 3. Installer le schéma Supabase
+## 3. Démarrer l’application Streamlit
+
+Après l’installation des dépendances et la préparation des exports, lancer
+l’application depuis la racine du dépôt, dans l’environnement virtuel activé :
+
+```bash
+python -m streamlit run app.py
+```
+
+Ouvrir ensuite [http://localhost:8501](http://localhost:8501) dans le navigateur.
+Pour arrêter le serveur, revenir au terminal et appuyer sur `Ctrl+C`.
+
+L’application présente l’historique énergétique, les résultats simulés et la
+qualité des données. Le filtre de période ajuste les indicateurs et graphiques ;
+un export CSV de la période affichée est disponible dans l’onglet historique.
+Le bouton d’actualisation recharge les exports locaux après une nouvelle
+préparation.
+
+> [!NOTE]
+> Streamlit lit les fichiers préparés dans `outputs/` ; il ne lit pas encore
+> directement Supabase. L’écran de suivi présente les dernières données historiques
+> exportées, pas un flux temps réel. Il ne nécessite pas les variables Supabase.
+> Relancer `python -m twin prepare` si les exports sont absents ou à actualiser.
+
+## 4. Installer le schéma Supabase
 
 Dans le projet Supabase de destination, ouvrir **SQL Editor**, coller le contenu
 de [sql/schema.sql](sql/schema.sql), puis cliquer sur **Run**. Vérifier que
 l’exécution réussit. Cette étape installe les quatre tables ; elle ne charge pas de données.
 Si le schéma est déjà installé et correspond au fichier, passer à l’étape suivante.
 
-## 4. Configurer les accès et charger
+## 5. Configurer les accès et charger
 
 Créer le fichier local de secrets, seulement s’il n’existe pas encore :
 
@@ -102,7 +126,7 @@ Cette commande **écrit réellement dans Supabase**, par lots de 500 lignes maxi
 puis vérifie les comptages. Les upserts permettent de reprendre après une interruption
 sans doublons. Dans un nouveau terminal, réactiver `.venv` et recharger `.env`.
 
-## 5. Vérifier le résultat
+## 6. Vérifier le résultat
 
 Les logs doivent indiquer les lignes vérifiées. Dans **Table Editor**, pour la
 configuration par défaut et une première ingestion dans une base vide :
