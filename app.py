@@ -1,5 +1,6 @@
 import json
 
+import numpy as np
 import pandas as pd
 import streamlit as st
 
@@ -10,6 +11,30 @@ st.set_page_config(
     page_title="Jumeau énergétique",
     page_icon="🏢",
     layout="wide",
+)
+
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background: linear-gradient(180deg, #f3f7f6 0%, #ffffff 280px);
+    }
+    [data-testid="stMetric"] {
+        background: #ffffff;
+        border: 1px solid #e2eae7;
+        border-radius: 14px;
+        padding: 16px 18px;
+        box-shadow: 0 3px 12px rgba(18, 56, 48, 0.05);
+    }
+    [data-testid="stMetricLabel"] {
+        color: #58716a;
+    }
+    h1, h2, h3 {
+        color: #173c34;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
 
@@ -35,28 +60,34 @@ def render_overview(data: DashboardData, building_id: str, run_id: str):
         measurements["outdoor_temperature_processed_c"].isna().sum()
     )
 
-    columns = st.columns(4)
+    daily_energy = measurements.groupby(
+        measurements["timestamp_local"].dt.date
+    )["consumption_kwh"].sum(min_count=1)
+    peak_day = daily_energy.idxmax()
+    columns = st.columns(5)
     columns[0].metric("Heures historiques", f"{len(measurements):,}".replace(",", " "))
     columns[1].metric(
-        "Consommation moyenne",
-        f"{measurements['consumption_kwh'].mean():.2f} kWh/intervalle",
+        "Énergie totale",
+        f"{measurements['consumption_kwh'].sum():,.0f} kWh".replace(",", " "),
     )
-    columns[2].metric("Heures électriques manquantes", f"{quality['missing']:,}".replace(",", " "))
-    columns[3].metric("Lignes météo absentes", f"{missing_weather:,}".replace(",", " "))
-
-    columns = st.columns(4)
-    columns[0].metric(
-        "Températures imputées",
-        f"{int(measurements['temperature_imputed'].sum()):,}".replace(",", " "),
+    columns[2].metric(
+        "Moyenne par intervalle",
+        f"{measurements['consumption_kwh'].mean():.2f} kWh",
     )
-    columns[1].metric("Températures non résolues", f"{unresolved_temperature:,}")
-    columns[2].metric("États simulés", f"{len(states):,}".replace(",", " "))
     columns[3].metric(
-        "Occupation moyenne simulée",
-        f"{states['occupancy_rate'].mean() * 100:.1f} %",
+        "Couverture électrique",
+        f"{quality.get('min_monthly_valid_pct', 0):.1f} %",
+    )
+    columns[4].metric("Pic journalier", f"{daily_energy.loc[peak_day]:.0f} kWh")
+
+    st.caption(
+        f"Période : {first_hour:%d/%m/%Y %H:%M} — {last_hour:%d/%m/%Y %H:%M} · "
+        f"Jour de pointe : {pd.Timestamp(peak_day):%d/%m/%Y} · "
+        f"{missing_weather} heures sans ligne météo · "
+        f"{int(measurements['temperature_imputed'].sum())} températures imputées · "
+        f"{unresolved_temperature} température(s) non résolue(s)"
     )
 
-    st.caption(f"Période disponible : {first_hour:%d/%m/%Y %H:%M} — {last_hour:%d/%m/%Y %H:%M}")
     window = st.selectbox(
         "Période affichée",
         ["Période complète", "30 derniers jours", "7 derniers jours"],
@@ -72,56 +103,120 @@ def render_overview(data: DashboardData, building_id: str, run_id: str):
 
     measurements = measurements.set_index("timestamp_local")
     states = states.set_index("timestamp_local")
+    states = states.loc[states.index.isin(measurements.index)]
 
-    left, right = st.columns(2)
-    with left:
-        st.subheader("Consommation électrique")
-        daily_consumption = measurements["consumption_kwh"].resample("D").mean()
-        st.line_chart(daily_consumption, y_label="kWh par intervalle horaire")
-    with right:
-        st.subheader("Température extérieure")
-        daily_outdoor = measurements["outdoor_temperature_processed_c"].resample("D").mean()
-        st.line_chart(daily_outdoor, y_label="°C")
-
-    left, right = st.columns(2)
-    with left:
-        st.subheader("Occupation simulée")
-        daily_occupancy = states["occupancy_rate"].resample("D").mean()
-        st.line_chart(daily_occupancy, y_label="Taux d’occupation")
-    with right:
-        st.subheader("État thermique simulé")
-        daily_indoor = states["indoor_temperature_c"].resample("D").mean()
-        st.line_chart(daily_indoor, y_label="°C")
-
-    st.subheader("Qualité des mesures électriques")
-    monthly = pd.DataFrame(quality.get("monthly", []))
-    if not monthly.empty:
-        st.dataframe(monthly, use_container_width=True, hide_index=True)
-    st.caption(
-        f"Première heure : {quality.get('first_positive') or '—'} · "
-        f"Dernière heure : {quality.get('last_positive') or '—'} · "
-        f"Séquence manquante maximale : {quality.get('longest_missing_hours', 0)} h · "
-        f"Séquence de zéros maximale : {quality.get('longest_zero_hours', 0)} h"
+    historical_tab, simulation_tab, quality_tab = st.tabs(
+        ["Historique énergétique", "Simulation", "Qualité des données"]
     )
 
-    with st.expander("Rapport qualité complet"):
-        st.json(data.quality_report)
-
-    with st.expander("Détails de l’exécution de simulation"):
-        st.write(
+    with historical_tab:
+        st.subheader("Énergie journalière")
+        daily_energy = measurements["consumption_kwh"].resample("D").sum(min_count=1)
+        trend = pd.DataFrame(
             {
-                "run_id": run["run_id"],
-                "model_version": run["model_version"],
-                "états_attendus": int(run["expected_states"]),
-                "température_intérieure_moyenne_c": round(
-                    float(states["indoor_temperature_c"].mean()), 2
-                ),
-                "énergie_thermique_HVAC_signée_kwh": round(
-                    float(states["hvac_thermal_energy_kwh"].sum()), 2
-                ),
+                "Énergie journalière": daily_energy,
+                "Moyenne mobile 7 jours": daily_energy.rolling(
+                    7, min_periods=1
+                ).mean(),
             }
         )
-        st.json(run.get("parameters", {}))
+        st.line_chart(
+            trend,
+            y_label="Énergie électrique (kWh/jour)",
+            height=340,
+        )
+
+        hourly = measurements.assign(
+            heure=measurements.index.hour,
+            période=np.where(measurements.index.dayofweek >= 5, "Week-end", "Semaine"),
+        )
+        profile = hourly.groupby(["heure", "période"])["consumption_kwh"].mean().unstack()
+        left, right = st.columns(2)
+        with left:
+            st.subheader("Profil moyen par heure")
+            st.bar_chart(profile, y_label="kWh par intervalle")
+        with right:
+            st.subheader("Consommation et température extérieure")
+            scatter = measurements[
+                ["outdoor_temperature_processed_c", "consumption_kwh"]
+            ].dropna()
+            if scatter.empty:
+                st.info("Pas assez de données météo pour afficher cette relation.")
+            else:
+                st.scatter_chart(
+                    scatter,
+                    x="outdoor_temperature_processed_c",
+                    y="consumption_kwh",
+                    x_label="Température extérieure (°C)",
+                    y_label="Électricité (kWh par intervalle)",
+                    height=340,
+                )
+            st.caption("Relation descriptive ; elle ne démontre pas un lien causal.")
+
+    with simulation_tab:
+        st.info(
+            "L’occupation, la température intérieure et l’énergie HVAC ci-dessous "
+            "sont simulées ; elles ne sont pas des mesures du bâtiment."
+        )
+        left, right = st.columns(2)
+        with left:
+            st.subheader("Températures moyenne par jour")
+            temperatures = pd.DataFrame(
+                {
+                    "Extérieure observée / traitée": measurements[
+                        "outdoor_temperature_processed_c"
+                    ].resample("D").mean(),
+                    "Intérieure simulée": states["indoor_temperature_c"].resample("D").mean(),
+                }
+            )
+            st.line_chart(temperatures, y_label="Température (°C)", height=340)
+        with right:
+            st.subheader("Occupation simulée")
+            daily_occupancy = states["occupancy_rate"].resample("D").mean() * 100
+            st.area_chart(
+                daily_occupancy,
+                y_label="Occupation moyenne (%)",
+                height=340,
+            )
+
+        st.subheader("Énergie thermique HVAC simulée")
+        hvac_energy = states["hvac_thermal_energy_kwh"].resample("D").sum(min_count=1)
+        st.bar_chart(
+            hvac_energy,
+            y_label="kWh thermiques par jour (chauffage + / refroidissement −)",
+            height=300,
+        )
+        st.caption(
+            f"Modèle {run['model_version']} · {len(states):,} états · "
+            f"température intérieure moyenne {states['indoor_temperature_c'].mean():.1f} °C · "
+            f"énergie HVAC thermique signée cumulée {states['hvac_thermal_energy_kwh'].sum():.1f} kWh"
+        )
+        with st.expander("Paramètres de cette exécution"):
+            st.json(run.get("parameters", {}))
+
+    with quality_tab:
+        st.subheader("Complétude mensuelle des mesures")
+        monthly = pd.DataFrame(quality.get("monthly", []))
+        if not monthly.empty:
+            monthly["timestamp"] = pd.to_datetime(monthly["timestamp"], errors="raise")
+            monthly["complétude (%)"] = (
+                monthly["positive_finite"] / monthly["expected"] * 100
+            )
+            st.bar_chart(
+                monthly.set_index("timestamp")[["complétude (%)"]],
+                y_label="Heures valides (%)",
+                height=320,
+            )
+            st.dataframe(monthly, use_container_width=True, hide_index=True)
+        st.caption(
+            f"Heures électriques manquantes : {quality.get('missing', 0)} · "
+            f"zéros : {quality.get('zeros', 0)} · "
+            f"négatives : {quality.get('negative', 0)} · "
+            f"séquence manquante maximale : {quality.get('longest_missing_hours', 0)} h · "
+            f"séquence constante maximale : {quality.get('longest_constant_hours', 0)} h"
+        )
+        with st.expander("Rapport qualité complet"):
+            st.json(data.quality_report)
 
 
 def render_live_view(data: DashboardData, building_id: str, run_id: str):
