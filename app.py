@@ -56,53 +56,73 @@ def render_overview(data: DashboardData, building_id: str, run_id: str):
         f"exports actualisés le {data.exports_updated_at:%d/%m/%Y à %H:%M}"
     )
 
+    last_available_hour = measurements["timestamp_local"].max()
+    window = st.sidebar.selectbox(
+        "Période affichée",
+        ["Période complète", "30 derniers jours", "7 derniers jours"],
+    )
+    if window == "30 derniers jours":
+        start = last_available_hour.normalize() - pd.Timedelta(days=29)
+        measurements = measurements.loc[measurements["timestamp_local"] >= start]
+    elif window == "7 derniers jours":
+        start = last_available_hour.normalize() - pd.Timedelta(days=6)
+        measurements = measurements.loc[measurements["timestamp_local"] >= start]
+
+    if measurements.empty:
+        st.info("Aucune mesure disponible pour la période sélectionnée.")
+        return
+
     first_hour = measurements["timestamp_local"].min()
     last_hour = measurements["timestamp_local"].max()
     missing_weather = int((~measurements["weather_row_present"]).sum())
     unresolved_temperature = int(
         measurements["outdoor_temperature_processed_c"].isna().sum()
     )
+    valid_consumption = (
+        measurements["consumption_kwh"].notna()
+        & np.isfinite(measurements["consumption_kwh"])
+        & measurements["consumption_kwh"].gt(0)
+    )
 
     daily_energy = measurements.groupby(
         measurements["timestamp_local"].dt.date
     )["consumption_kwh"].sum(min_count=1)
-    peak_day = daily_energy.idxmax()
-    columns = st.columns(5)
-    columns[0].metric("Heures historiques", f"{len(measurements):,}".replace(",", " "))
+    peak_day = daily_energy.idxmax() if daily_energy.notna().any() else None
+    columns = st.columns(4)
     columns[1].metric(
-        "Énergie totale",
-        f"{measurements['consumption_kwh'].sum():,.0f} kWh".replace(",", " "),
+        "Total période",
+        f"{measurements['consumption_kwh'].sum(min_count=1):,.0f} kWh".replace(",", " "),
+    )
+    columns[0].metric(
+        "Moyenne / intervalle",
+        f"{measurements['consumption_kwh'].mean():.2f} kWh",
+        help="Énergie moyenne par intervalle horaire ; ce n’est pas une puissance en kW.",
     )
     columns[2].metric(
-        "Moyenne par intervalle",
-        f"{measurements['consumption_kwh'].mean():.2f} kWh",
+        "Couverture",
+        f"{100 * valid_consumption.mean():.1f} %",
     )
     columns[3].metric(
-        "Couverture électrique",
-        f"{quality.get('min_monthly_valid_pct', 0):.1f} %",
+        "Pic journalier",
+        f"{daily_energy.loc[peak_day]:.0f} kWh" if peak_day is not None else "—",
     )
-    columns[4].metric("Pic journalier", f"{daily_energy.loc[peak_day]:.0f} kWh")
 
+    period_caption = (
+        f"Période : {first_hour:%d/%m/%Y %H:%M} — {last_hour:%d/%m/%Y %H:%M}"
+    )
+    if peak_day is not None:
+        period_caption += f" · Jour de pointe : {pd.Timestamp(peak_day):%d/%m/%Y}"
+    st.caption(period_caption)
+    hours_display = f"{len(measurements):,}".replace(",", " ")
     st.caption(
-        f"Période : {first_hour:%d/%m/%Y %H:%M} — {last_hour:%d/%m/%Y %H:%M} · "
-        f"Jour de pointe : {pd.Timestamp(peak_day):%d/%m/%Y} · "
-        f"{missing_weather} heures sans ligne météo · "
+        f"{hours_display} heures · {missing_weather} heures sans ligne météo · "
         f"{int(measurements['temperature_imputed'].sum())} températures imputées · "
         f"{unresolved_temperature} température(s) non résolue(s)"
     )
-
-    window = st.selectbox(
-        "Période affichée",
-        ["Période complète", "30 derniers jours", "7 derniers jours"],
+    st.info(
+        "Données historiques préparées localement — cette application n’est pas "
+        "encore connectée à un flux temps réel."
     )
-    if window == "30 derniers jours":
-        measurements = measurements.loc[
-            measurements["timestamp_local"] >= last_hour - pd.Timedelta(days=30)
-        ]
-    elif window == "7 derniers jours":
-        measurements = measurements.loc[
-            measurements["timestamp_local"] >= last_hour - pd.Timedelta(days=7)
-        ]
 
     measurements = measurements.set_index("timestamp_local")
     states = states.set_index("timestamp_local")
@@ -113,6 +133,12 @@ def render_overview(data: DashboardData, building_id: str, run_id: str):
     )
 
     with historical_tab:
+        st.download_button(
+            "Télécharger les données de la période (CSV)",
+            data=measurements.reset_index().to_csv(index=False).encode("utf-8"),
+            file_name=f"{building_id}_{window.lower().replace(' ', '_')}.csv",
+            mime="text/csv",
+        )
         st.subheader("Énergie journalière")
         daily_energy = measurements["consumption_kwh"].resample("D").sum(min_count=1)
         trend = pd.DataFrame(
@@ -211,7 +237,7 @@ def render_overview(data: DashboardData, building_id: str, run_id: str):
                 y_label="Heures valides (%)",
                 height=320,
             )
-            st.dataframe(monthly, use_container_width=True, hide_index=True)
+            st.dataframe(monthly, width="stretch", hide_index=True)
         st.caption(
             f"Heures électriques manquantes : {quality.get('missing', 0)} · "
             f"zéros : {quality.get('zeros', 0)} · "
@@ -273,7 +299,7 @@ def render_live_view(data: DashboardData, building_id: str, run_id: str):
     columns[2].metric("Occupants simulés", f"{int(latest['occupants']):,}".replace(",", " "))
     columns[3].metric("Température intérieure simulée", f"{latest['indoor_temperature_c']:.1f} °C")
     st.subheader("Dernières 24 heures de l’export")
-    st.dataframe(recent, use_container_width=True, hide_index=True)
+    st.dataframe(recent, width="stretch", hide_index=True)
 
 
 def main():
