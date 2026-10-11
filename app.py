@@ -104,6 +104,9 @@ def render_overview(data: DashboardData, building_id: str, run_id: str):
         f"Séquence de zéros maximale : {quality.get('longest_zero_hours', 0)} h"
     )
 
+    with st.expander("Rapport qualité complet"):
+        st.json(data.quality_report)
+
     with st.expander("Détails de l’exécution de simulation"):
         st.write(
             {
@@ -118,6 +121,7 @@ def render_overview(data: DashboardData, building_id: str, run_id: str):
                 ),
             }
         )
+        st.json(run.get("parameters", {}))
 
 
 def render_live_view(data: DashboardData, building_id: str, run_id: str):
