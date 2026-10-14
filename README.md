@@ -181,9 +181,15 @@ Deux possibilités :
   chargeur REST ci-dessous.
 
 Ces deux chemins créent uniquement `public.training_measurements`. Ils ne
-suppriment aucune ancienne table. Sur un projet déjà alimenté, les quatre tables
-historiques restent des sources ; leur suppression éventuelle est une opération
-de migration séparée. Sur une base vide, le schéma applicatif final comporte une table.
+suppriment aucune ancienne table. Après vérification du chargement, la migration
+[sql/archive_legacy_tables.sql](sql/archive_legacy_tables.sql) déplace les quatre
+anciennes tables vers le schéma `archive`, avec leurs données et relations. Elle
+refuse de déplacer les sources si les mesures finales diffèrent et ne remplace
+jamais une archive existante. Une seule table reste active dans `public`.
+
+Cette migration a été effectuée sur le projet Supabase le 14 octobre 2026 :
+17 544 lignes, 25 colonnes et 16 700 heures exploitables pour l’entraînement.
+Les quatre tables sources sont conservées dans `archive`.
 
 Pour le chargeur REST, créer `.env` à partir de `.env.example` si nécessaire, puis
 renseigner l’URL HTTPS du projet et une clé serveur `sb_secret_…` ou legacy
@@ -203,6 +209,12 @@ Le dry-run valide les fichiers sans réseau ni secrets. Le chargement réel
 effectue des upserts sur `(building_id, timestamp_local)` et vérifie les
 comptages du périmètre. Il peut être relancé sans doublons. RLS est activé sans
 politique publique ; la clé serveur reste côté serveur.
+
+Une session Supabase CLI authentifiée peut installer le petit schéma avec
+`supabase db query --linked --project-ref <PROJECT_REF> --file sql/schema.sql`,
+puis exécuter le fichier d’archivage après chargement. L’import SQL rempli fait
+environ 4 Mo : l’API de gestion l’a refusé avec HTTP 413. Utiliser un client
+PostgreSQL direct ou le chargeur REST par lots pour les données.
 
 ## 7. Vérifier et contribuer
 

@@ -60,12 +60,27 @@ réussissent. Le code de sélection du notebook est conservé ; son fichier a é
 `notebooks/01_selection_batiment.ipynb` et ses chemins de données adaptés. Les
 sorties historiques sont conservées, sans réexécution complète faute de CSV BDG2.
 
-## Limites de cette validation
+## Chargement réel dans Supabase — 14 octobre 2026
 
-Aucun accès Supabase n’a été effectué pour cette nouvelle table : les variables
-d’accès ne sont pas configurées dans cette session. Les anciennes tables distantes
-ne sont pas modifiées. Le SQL est vérifié sur PostgreSQL local ; le transport REST
-est vérifié avec une API simulée, pas sur le projet de production.
+La session CLI Supabase existante a permis de retrouver le projet
+`iiubijthccrphoprbiaq` et d’installer le schéma. Le SQL rempli d’environ 4 Mo a été
+refusé par l’API de gestion (HTTP 413) ; le chargement a donc utilisé le chargeur
+REST existant, en 36 lots de 500 lignes au maximum. La clé serveur a été utilisée
+en mémoire, sans création de fichier `.env` ni publication de secret.
+
+- Une seule table active dans `public` : `training_measurements`.
+- 17 544 lignes, 25 colonnes et 16 700 lignes techniquement exploitables.
+- 17 544 annotations d’anomalie NULL et RLS activé.
+- Comparaison paginée des 17 544 lignes et de toutes leurs colonnes à l’export
+  local : concordance à tolérance numérique 1e-12 ; écart maximal observé
+  4,98e-14 dans la représentation numérique REST.
+- Migration `sql/archive_legacy_tables.sql` exécutée après vérification : les
+  quatre sources sont conservées dans `archive` avec les mêmes comptages
+  (1 bâtiment, 17 544 historiques, 1 exécution, 17 544 états simulés).
+- Les relations de clés étrangères des archives restent validées.
+- Rapport local : `outputs/deployment/supabase_validation.json`.
+
+## Limites restantes
 
 Aucun modèle prédictif ou détecteur n’est entraîné. Les paramètres thermiques et
 l’occupation réelle ne sont pas validés, et la convention opérationnelle des

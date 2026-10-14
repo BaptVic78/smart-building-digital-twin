@@ -16,7 +16,8 @@ smart-building-digital-twin/
 ├── notebooks/
 │   └── 01_selection_batiment.ipynb    exploration et justification du choix de Miriam
 ├── sql/
-│   └── schema.sql                    schéma PostgreSQL de la table finale
+│   ├── schema.sql                    schéma PostgreSQL de la table finale
+│   └── archive_legacy_tables.sql     migration réversible des quatre tables sources
 ├── docs/
 │   ├── organisation.md               ce plan et les possibilités de nettoyage
 │   ├── contexte.md                   cadrage, décisions et historique du projet
@@ -34,6 +35,7 @@ smart-building-digital-twin/
 └── outputs/                          résultats générés, exclus de Git
     ├── dataset/                      base finale, exports, métadonnées et manifeste
     ├── diagnostics/                  graphiques et diagnostics si exécutés
+    ├── deployment/                   rapport de vérification du chargement distant
     └── archives/                     anciennes métadonnées de génération
 ```
 

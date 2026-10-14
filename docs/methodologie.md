@@ -146,6 +146,13 @@ ne sont pas journalisées. Le dry-run n’effectue aucune requête et ne lit pas
 secrets.
 
 Le dashboard utilise les exports de cette table unique et les métadonnées. Il
-présente les historiques et la simulation, pas un flux temps réel. La suppression
-des anciennes tables d’un projet Supabase existant n’est pas incluse dans ce
-changement : les données sources sont préservées.
+présente les historiques et la simulation, pas un flux temps réel.
+
+Après import, `sql/archive_legacy_tables.sql` compare les clés, consommations et
+indicateurs de présence des sources à la table finale. En cas d’écart, la
+transaction échoue. Sinon, les quatre anciennes tables sont déplacées dans le
+schéma `archive` : leurs données, clés et relations sont conservées, et aucune
+archive existante n’est écrasée. La table finale reste seule dans `public`.
+Les commandes de restauration sont indiquées en commentaires dans la migration.
+Le 14 octobre 2026, les 17 544 lignes distantes et leurs 25 colonnes ont été
+comparées à l’export local après le chargement réel par lots.

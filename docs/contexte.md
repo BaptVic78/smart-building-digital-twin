@@ -28,6 +28,11 @@ Le dépôt a ensuite été rangé : le notebook est dans `notebooks/01_selection
 les exports sources dans `data/imports/supabase/`, les résultats actifs dans
 `outputs/dataset/` et le portfolio local dans `docs/references/`. Les dépendances
 historiques sont archivées dans `docs/archives/`. Voir [organisation.md](organisation.md).
+La base Supabase a ensuite été actualisée via la session CLI : une seule table
+`public.training_measurements` contient les 17 544 lignes finales. Les quatre
+anciennes tables ont été conservées dans le schéma `archive`, après contrôle des
+mesures. Les 25 colonnes de toutes les lignes ont été comparées aux exports locaux.
+La migration réversible est versionnée dans `sql/archive_legacy_tables.sql`.
 Les modèles prédictifs, la détection, les injections et les recommandations
 restent à développer. Les hypothèses de simulation thermique et d’occupation ne
 sont pas calibrées sur le bâtiment réel.
