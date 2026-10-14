@@ -5,7 +5,7 @@ fonttools==4.66.1
 kiwisolver==1.5.1
 matplotlib==3.10.3
 numpy==2.2.6
-packaging==26.3
+packaging==25.0
 pandas==2.2.3
 pillow==12.3.0
 pyparsing==3.3.3

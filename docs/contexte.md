@@ -1,6 +1,37 @@
 # Contexte du projet PFE
 
-Dernière mise à jour : 2 octobre 2026.
+Dernière mise à jour : 14 octobre 2026.
+
+## État vérifié au 14 octobre 2026
+
+À la demande de l’utilisateur, le pipeline produit désormais une seule table
+`training_measurements`, 25 colonnes et 17 544 heures. Les quatre tables de la
+première version restent uniquement des sources possibles de l’import COPY.
+Les constantes bâtiment, empreintes et paramètres sont conservés dans des
+fichiers de métadonnées, sans tables supplémentaires dans la base finale.
+
+La température est traitée causalement par défaut. Les entrées initiales du
+modèle sont le calendrier, trois décalages de consommation, deux moyennes du passé
+et la température extérieure décalée. La cible, la météo de l’heure cible et les
+états simulés sont exclus de ces entrées. Les quatre étiquettes DST et leurs
+fenêtres contaminées sont masquées pour l’entraînement, sans supprimer les lignes.
+
+Découpage retenu : entraînement en 2016, validation de janvier à juin 2017, test
+de juillet à décembre 2017. Sur l’export SQL fourni, 16 700 heures sont techniquement
+exploitables (8 278 / 4 175 / 4 247 par partition). Toutes les annotations d’anomalie
+restent NULL : l’historique n’est pas déclaré entièrement normal.
+
+`python -m twin prepare --from-dump donnees.sql` a généré la base SQLite, le SQL
+PostgreSQL rempli, les exports CSV/JSON et les rapports. Le dashboard lit ce
+format et expose les données d’entraînement. Le notebook d’exploration est conservé.
+Les modèles prédictifs, la détection, les injections et les recommandations
+restent à développer. Les hypothèses de simulation thermique et d’occupation ne
+sont pas calibrées sur le bâtiment réel.
+
+Consulter [validation.md](validation.md) pour les vérifications et
+[methodologie.md](methodologie.md) pour le contrat des variables. Les sections
+historiques ci-dessous décrivent le cadrage au 2 octobre ; cet état plus récent
+et les fichiers exécutables priment en cas de différence.
 
 Ce fichier permet à un agent de reprendre le projet sans accéder aux conversations précédentes. Il décrit l'état connu à cette date. Les instructions explicites de l'utilisateur et les fichiers actuels du dépôt priment sur ce résumé. Une proposition n'est pas une décision validée et une sortie de notebook n'est pas une vérification indépendante des données.
 

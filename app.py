@@ -41,13 +41,21 @@ st.markdown(
 )
 
 
-def render_overview(data: DashboardData, building_id: str, run_id: str):
-    building = data.buildings.loc[data.buildings["building_id"].eq(building_id)].iloc[0]
+def render_overview(data: DashboardData, building_id: str):
+    building = data.metadata["building"]
     measurements = data.measurements.loc[
         data.measurements["building_id"].eq(building_id)
     ].copy()
-    run = data.simulation_runs.loc[data.simulation_runs["run_id"].eq(run_id)].iloc[0]
-    states = data.states.loc[data.states["run_id"].eq(run_id)].copy()
+    run = data.metadata["simulation"]
+    states = measurements[
+        [
+            "timestamp_local",
+            "occupants",
+            "indoor_temperature_c",
+            "hvac_thermal_energy_kwh",
+        ]
+    ].copy()
+    states["occupancy_rate"] = states["occupants"] / run["capacity"]
     quality = data.quality_report["electricity"]
 
     st.title("Vue d’ensemble")
@@ -84,14 +92,16 @@ def render_overview(data: DashboardData, building_id: str, run_id: str):
         & measurements["consumption_kwh"].gt(0)
     )
 
-    daily_energy = measurements.groupby(
-        measurements["timestamp_local"].dt.date
-    )["consumption_kwh"].sum(min_count=1)
+    daily_energy = measurements.groupby(measurements["timestamp_local"].dt.date)[
+        "consumption_kwh"
+    ].sum(min_count=1)
     peak_day = daily_energy.idxmax() if daily_energy.notna().any() else None
     columns = st.columns(4)
     columns[1].metric(
         "Total période",
-        f"{measurements['consumption_kwh'].sum(min_count=1):,.0f} kWh".replace(",", " "),
+        f"{measurements['consumption_kwh'].sum(min_count=1):,.0f} kWh".replace(
+            ",", " "
+        ),
     )
     columns[0].metric(
         "Moyenne / intervalle",
@@ -128,8 +138,13 @@ def render_overview(data: DashboardData, building_id: str, run_id: str):
     states = states.set_index("timestamp_local")
     states = states.loc[states.index.isin(measurements.index)]
 
-    historical_tab, simulation_tab, quality_tab = st.tabs(
-        ["Historique énergétique", "Simulation", "Qualité des données"]
+    historical_tab, simulation_tab, quality_tab, training_tab = st.tabs(
+        [
+            "Historique énergétique",
+            "Simulation",
+            "Qualité des données",
+            "Données d’entraînement",
+        ]
     )
 
     with historical_tab:
@@ -144,9 +159,7 @@ def render_overview(data: DashboardData, building_id: str, run_id: str):
         trend = pd.DataFrame(
             {
                 "Énergie journalière": daily_energy,
-                "Moyenne mobile 7 jours": daily_energy.rolling(
-                    7, min_periods=1
-                ).mean(),
+                "Moyenne mobile 7 jours": daily_energy.rolling(7, min_periods=1).mean(),
             }
         )
         st.line_chart(
@@ -159,7 +172,9 @@ def render_overview(data: DashboardData, building_id: str, run_id: str):
             heure=measurements.index.hour,
             période=np.where(measurements.index.dayofweek >= 5, "Week-end", "Semaine"),
         )
-        profile = hourly.groupby(["heure", "période"])["consumption_kwh"].mean().unstack()
+        profile = (
+            hourly.groupby(["heure", "période"])["consumption_kwh"].mean().unstack()
+        )
         left, right = st.columns(2)
         with left:
             st.subheader("Profil moyen par heure")
@@ -195,8 +210,12 @@ def render_overview(data: DashboardData, building_id: str, run_id: str):
                 {
                     "Extérieure observée / traitée": measurements[
                         "outdoor_temperature_processed_c"
-                    ].resample("D").mean(),
-                    "Intérieure simulée": states["indoor_temperature_c"].resample("D").mean(),
+                    ]
+                    .resample("D")
+                    .mean(),
+                    "Intérieure simulée": states["indoor_temperature_c"]
+                    .resample("D")
+                    .mean(),
                 }
             )
             st.line_chart(temperatures, y_label="Température (°C)", height=340)
@@ -248,8 +267,28 @@ def render_overview(data: DashboardData, building_id: str, run_id: str):
         with st.expander("Rapport qualité complet"):
             st.json(data.quality_report)
 
+    with training_tab:
+        st.subheader("Table horaire pour la prévision à une heure")
+        st.caption(
+            "Les variables d’entrée utilisent le passé. L’occupation et les états thermiques sont simulés."
+        )
+        summary = measurements.groupby("training_split").agg(
+            heures=("consumption_kwh", "size"),
+            heures_exploitables=("is_training_ready", "sum"),
+        )
+        st.dataframe(summary, width="stretch")
+        st.info(
+            "Les annotations d’anomalie sont inconnues (NULL). Aucun modèle n’a encore été entraîné."
+        )
+        columns = data.metadata["feature_columns"] + [
+            "consumption_kwh",
+            "is_training_ready",
+            "anomaly_label",
+        ]
+        st.dataframe(measurements[columns].tail(48), width="stretch")
 
-def render_live_view(data: DashboardData, building_id: str, run_id: str):
+
+def render_live_view(data: DashboardData, building_id: str):
     st.title("Suivi opérationnel")
     st.warning(
         "Aucun flux temps réel n’est connecté. Les données ci-dessous proviennent "
@@ -262,21 +301,7 @@ def render_live_view(data: DashboardData, building_id: str, run_id: str):
     measurements = data.measurements.loc[
         data.measurements["building_id"].eq(building_id)
     ].copy()
-    states = data.states.loc[data.states["run_id"].eq(run_id)].copy()
-    recent = measurements.merge(
-        states[
-            [
-                "timestamp_local",
-                "occupants",
-                "indoor_temperature_c",
-                "hvac_thermal_energy_kwh",
-            ]
-        ],
-        on="timestamp_local",
-        how="left",
-        validate="one_to_one",
-    )
-    recent = recent.sort_values("timestamp_local").tail(24)
+    recent = measurements.sort_values("timestamp_local").tail(24)
     if recent.empty:
         st.info("Aucune donnée exportée pour ce bâtiment et cette exécution.")
         return
@@ -296,8 +321,12 @@ def render_live_view(data: DashboardData, building_id: str, run_id: str):
         "Température extérieure",
         f"{latest['outdoor_temperature_processed_c']:.1f} °C",
     )
-    columns[2].metric("Occupants simulés", f"{int(latest['occupants']):,}".replace(",", " "))
-    columns[3].metric("Température intérieure simulée", f"{latest['indoor_temperature_c']:.1f} °C")
+    columns[2].metric(
+        "Occupants simulés", f"{int(latest['occupants']):,}".replace(",", " ")
+    )
+    columns[3].metric(
+        "Température intérieure simulée", f"{latest['indoor_temperature_c']:.1f} °C"
+    )
     st.subheader("Dernières 24 heures de l’export")
     st.dataframe(recent, width="stretch", hide_index=True)
 
@@ -327,27 +356,20 @@ def main():
         )
         st.caption(str(error))
         if page == "Suivi (flux non connecté)":
-            st.warning("Le suivi en direct sera activé lorsqu’une source de flux sera configurée.")
+            st.warning(
+                "Le suivi en direct sera activé lorsqu’une source de flux sera configurée."
+            )
         return
     except (OSError, ValueError, KeyError, json.JSONDecodeError) as error:
         st.error(f"Impossible de charger les exports : {error}")
         return
 
-    building_ids = data.buildings["building_id"].tolist()
+    building_ids = data.measurements["building_id"].unique().tolist()
     building_id = st.sidebar.selectbox("Bâtiment", building_ids)
-    runs = data.simulation_runs.loc[
-        data.simulation_runs["building_id"].eq(building_id)
-    ]
-    run_ids = runs["run_id"].tolist()
-    if not run_ids:
-        st.error(f"Aucune exécution de simulation trouvée pour {building_id}.")
-        return
-    run_id = st.sidebar.selectbox("Exécution simulée", run_ids, format_func=str)
-
     if page == "Vue d’ensemble":
-        render_overview(data, building_id, run_id)
+        render_overview(data, building_id)
     else:
-        render_live_view(data, building_id, run_id)
+        render_live_view(data, building_id)
 
 
 if __name__ == "__main__":

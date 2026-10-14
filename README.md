@@ -1,24 +1,55 @@
 # Jumeau numérique énergétique — PFE
 
-Pipeline du bâtiment de bureaux **Hog_office_Miriam**, sur 2016–2017 : données
-électriques et météo historiques, simulation de l’occupation et de la température
-intérieure, puis ingestion dans Supabase. `test.ipynb` conserve l’analyse ayant
-motivé le choix du bâtiment. Le pipeline fonctionne sans Jupyter.
+Préparation des données du bâtiment de bureaux **Hog_office_Miriam** sur
+2016–2017 et tableau de bord Streamlit. La base finale contient **une seule table
+`training_measurements` : une ligne par bâtiment et par heure**, soit 17 544 lignes
+et 25 colonnes avec la configuration fournie.
 
-## 1. Installer et récupérer les données
+La consommation et la météo proviennent des historiques BDG2. L’occupation, la
+température intérieure et l’énergie thermique HVAC sont simulées et signalées
+comme telles. Le dataset prépare la prévision à une heure ; aucun modèle
+prédictif ni détecteur d’anomalies n’est encore entraîné.
 
-Cloner ce dépôt, se placer à sa racine et utiliser **Python 3.12**.
-Les commandes ci-dessous sont prévues pour Bash sous Linux/macOS.
+## 1. Installer
+
+Depuis la racine du dépôt, utiliser Python 3.12 :
 
 ```bash
-python3 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-Les données ne sont pas incluses dans ce dépôt. Installer [Git LFS](https://git-lfs.com/)
-(`sudo apt install git-lfs` sous Ubuntu/Debian), puis télécharger les trois CSV
-BDG2 depuis la racine du projet :
+## 2. Générer la base finale
+
+Deux sources sont possibles. Une seule des deux commandes `prepare` est nécessaire.
+
+### Depuis l’export Supabase existant
+
+Placer l’export de données PostgreSQL au format COPY dans `donnees.sql`, à la racine :
+
+```bash
+python -m twin prepare --from-dump donnees.sql
+python -m twin load --dry-run
+```
+
+Le fichier est lu comme des données : **son SQL n’est jamais exécuté**. Seules les
+anciennes tables `public.buildings` et `public.historical_measurements` sont lues.
+Les anciennes interpolations rétrospectives sont écartées : la température est
+retraitée depuis l’original et le contexte simulé est régénéré selon `config.json`.
+Les tables `auth` et `storage` ne sont pas importées. `structure.sql` n’est pas requis.
+
+### Depuis les trois CSV BDG2
+
+Si `data/metadata/metadata.csv`, `data/meters/raw/electricity.csv` et
+`data/weather/weather.csv` sont déjà présents :
+
+```bash
+python -m twin prepare
+python -m twin load --dry-run
+```
+
+Sinon, installer [Git LFS](https://git-lfs.com/) et récupérer ces fichiers :
 
 ```bash
 GIT_LFS_SKIP_SMUDGE=1 git clone --depth 1 \
@@ -27,145 +58,161 @@ git -C ../bdg2-source lfs install --local
 git -C ../bdg2-source lfs pull \
   --include="data/metadata/metadata.csv,data/meters/raw/electricity.csv,data/weather/weather.csv" \
   --exclude=""
-
 mkdir -p data/metadata data/meters/raw data/weather
 cp -n ../bdg2-source/data/metadata/metadata.csv data/metadata/
 cp -n ../bdg2-source/data/meters/raw/electricity.csv data/meters/raw/
 cp -n ../bdg2-source/data/weather/weather.csv data/weather/
-```
-
-Si `../bdg2-source` existe déjà, sauter la commande de clone.
-Les chemins et paramètres sont définis dans [config.json](config.json).
-
-## 2. Préparer et vérifier les exports
-
-```bash
 python -m twin prepare
-python -m twin load --dry-run
 ```
 
-`prepare` lit et valide les sources, joint la météo du site, traite les petits
-trous de température et simule l’occupation et la température intérieure.
-Il écrit les quatre tables en CSV/JSON et `quality_report.json` dans `outputs/`.
-Il n’écrit rien dans Supabase. Une seule exécution suffit ; la relancer remplace
-les exports locaux. Ne pas modifier les JSON manuellement : leurs empreintes sont vérifiées.
+Sauter le clone si `../bdg2-source` existe déjà. Les sources, paramètres, dates de
+séparation et dossier de sortie sont configurables dans [config.json](config.json).
 
-Le **dry-run** vérifie les exports sans réseau, sans secrets et sans écriture.
-Pour produire les graphiques du notebook ou exécuter les tests :
+## 3. Fichiers produits dans `outputs/`
 
-```bash
-python -m twin diagnose                    # Optionnel
-python -m unittest discover -s tests -v
+| Fichier | Utilisation |
+|---|---|
+| `training_measurements.sqlite` | Base locale complète, avec une seule table |
+| `training_measurements.sql` | Schéma PostgreSQL et données, import transactionnel avec upserts |
+| `training_measurements.csv` | Analyse et échange de données |
+| `training_measurements.json` | Chargement REST Supabase et lecture du dashboard |
+| `dataset_metadata.json` | Liste des entrées du modèle, cible, provenance et paramètres de simulation |
+| `quality_report.json` | Comptages, qualité et disponibilité des lignes pour l’entraînement |
+| `manifest.json` | Empreintes des six fichiers ; un export modifié ou incomplet est refusé |
+
+`prepare` génère localement ces fichiers et ne modifie pas Supabase. Les données
+brutes, exports d’origine, secrets et résultats générés sont exclus de Git ; le
+code permet de les reconstruire. Relancer `prepare` remplace les fichiers de
+sortie. Un échec invalide le manifeste ; il faut une préparation réussie avant
+lecture ou chargement.
+
+## 4. Contenu et utilisation pour l’entraînement
+
+La ligne d’heure cible **s** contient `consumption_kwh = y(s)`. Les entrées mesurées
+viennent des étiquettes **s−1 ou antérieures** ; les variables calendaires décrivent s.
+
+| Groupe | Colonnes |
+|---|---|
+| Identification | `building_id`, `timestamp_local` |
+| Mesure cible et météo de contexte | `consumption_kwh`, `outdoor_temperature_processed_c` |
+| Contexte simulé | `occupants`, `indoor_temperature_c`, `hvac_thermal_energy_kwh`, `context_is_simulated` |
+| Calendrier | `hour`, `dayofweek` (lundi = 0), `month`, `is_weekend` |
+| Historique électrique | `consumption_lag_1h_kwh`, `consumption_lag_24h_kwh`, `consumption_lag_168h_kwh` |
+| Moyennes du passé | `consumption_mean_24h_kwh`, `consumption_mean_168h_kwh` |
+| Météo disponible avant la cible | `outdoor_temperature_lag_1h_c` |
+| Qualité et évaluation | `temperature_imputed`, `weather_row_present`, `electricity_row_present`, `dst_time_issue`, `training_split`, `is_training_ready`, `anomaly_label` |
+
+Utiliser exclusivement les **10 colonnes `feature_columns`** du fichier de
+métadonnées comme premières entrées. La température extérieure de l’heure cible,
+les états simulés, les annotations et la consommation cible sont exclus de cette
+liste. La météo prédictive est toujours imputée de façon causale, même si un mode
+de contexte rétrospectif est demandé explicitement.
+
+Les moyennes excluent la cible et exigent 24 ou 168 heures passées complètes.
+La consommation brute n’est ni imputée, ni écrêtée. Zéro reste une mesure possible ;
+une valeur négative/non finie est conservée mais écartée des entrées prédictives.
+
+Les heures DST ambiguës/inexistantes sont signalées sans conversion UTC inventée.
+Elles sont exclues des cibles exploitables et des historiques utilisés dans les
+variables ; les fenêtres qui les contiennent restent indisponibles. Toutes les
+lignes restent dans la table, avec **16 700 lignes exploitables** :
+
+| Partition | Période | Toutes les lignes | `is_training_ready = true` |
+|---|---|---:|---:|
+| `train` | 2016 | 8 784 | 8 278 |
+| `validation` | Janvier–juin 2017 | 4 344 | 4 175 |
+| `test` | Juillet–décembre 2017 | 4 416 | 4 247 |
+
+Les 844 lignes restantes correspondent aux 168 premières heures et aux quatre
+étiquettes DST avec leurs fenêtres affectées. `is_training_ready` décrit la
+disponibilité technique des données, **pas une certification de fonctionnement normal**.
+Toutes les annotations `anomaly_label` sont **NULL (inconnues)** ; 0 et 1 sont
+réservés à de futures annotations confirmées. Aucune anomalie n’est injectée ici.
+
+Exemple de lecture pour préparer un entraînement :
+
+```python
+import json
+import sqlite3
+import pandas as pd
+
+with open("outputs/dataset_metadata.json", encoding="utf-8") as source:
+    metadata = json.load(source)
+with sqlite3.connect("outputs/training_measurements.sqlite") as connection:
+    train = pd.read_sql_query(
+        "SELECT * FROM training_measurements "
+        "WHERE training_split = 'train' AND is_training_ready = 1 "
+        "ORDER BY timestamp_local", connection,
+    )
+X_train = train[metadata["feature_columns"]]
+y_train = train[metadata["target_column"]]
 ```
 
-## 3. Démarrer l’application Streamlit
+Le pas est une heure **nominale locale US/Central**. La disponibilité effective
+du relevé précédent et la convention début/fin de l’intervalle compteur restent
+à confirmer avant un branchement temps réel.
 
-Après l’installation des dépendances et la préparation des exports, lancer
-l’application depuis la racine du dépôt, dans l’environnement virtuel activé :
+## 5. Ouvrir le tableau de bord
 
 ```bash
 python -m streamlit run app.py
 ```
 
-Ouvrir ensuite [http://localhost:8501](http://localhost:8501) dans le navigateur.
-Pour arrêter le serveur, revenir au terminal et appuyer sur `Ctrl+C`.
+Ouvrir [http://localhost:8501](http://localhost:8501). Le dashboard lit la table
+unique locale : historique, contexte simulé, qualité et données d’entraînement.
+Le filtre de période et le téléchargement CSV restent disponibles. Après une
+nouvelle préparation, utiliser « Actualiser les exports ».
 
-L’application présente l’historique énergétique, les résultats simulés et la
-qualité des données. Le filtre de période ajuste les indicateurs et graphiques ;
-un export CSV de la période affichée est disponible dans l’onglet historique.
-Le bouton d’actualisation recharge les exports locaux après une nouvelle
-préparation.
+L’écran de suivi montre les derniers historiques exportés ; aucun flux temps
+réel n’est connecté. Les températures intérieures, l’occupation et le HVAC sont
+des hypothèses de démonstration non calibrées sur le bâtiment réel.
 
-> [!NOTE]
-> Streamlit lit les fichiers préparés dans `outputs/` ; il ne lit pas encore
-> directement Supabase. L’écran de suivi présente les dernières données historiques
-> exportées, pas un flux temps réel. Il ne nécessite pas les variables Supabase.
-> Relancer `python -m twin prepare` si les exports sont absents ou à actualiser.
+## 6. Charger la table finale dans Supabase
 
-## 4. Installer le schéma Supabase
+Deux possibilités :
 
-Dans le projet Supabase de destination, ouvrir **SQL Editor**, coller le contenu
-de [sql/schema.sql](sql/schema.sql), puis cliquer sur **Run**. Vérifier que
-l’exécution réussit. Cette étape installe les quatre tables ; elle ne charge pas de données.
-Si le schéma est déjà installé et correspond au fichier, passer à l’étape suivante.
+- Importer `outputs/training_measurements.sql` avec un client PostgreSQL. Le fichier
+  contient le schéma et toutes les données dans une transaction.
+- Installer [sql/schema.sql](sql/schema.sql) dans SQL Editor, puis utiliser le
+  chargeur REST ci-dessous.
 
-## 5. Configurer les accès et charger
+Ces deux chemins créent uniquement `public.training_measurements`. Ils ne
+suppriment aucune ancienne table. Sur un projet déjà alimenté, les quatre tables
+historiques restent des sources ; leur suppression éventuelle est une opération
+de migration séparée. Sur une base vide, le schéma applicatif final comporte une table.
 
-Créer le fichier local de secrets, seulement s’il n’existe pas encore :
-
-```bash
-cp .env.example .env
-```
-
-Renseigner les deux valeurs dans `.env` pour le **même projet Supabase**.
-
-> [!TIP]
-> **Où trouver ces valeurs ?**
->
-> - `SUPABASE_URL` : **Project Settings → Data API → API URL**.
->   Copier uniquement l’URL du projet, avant `/rest/v1` si ce suffixe est présent.
-> - `SUPABASE_SERVICE_ROLE_KEY` : **Project Settings → API Keys → Secret Keys → API KEY**.
->   Copier une clé secrète `sb_secret_…` ; la clé legacy `service_role` est aussi acceptée.
-
-```dotenv
-SUPABASE_URL=https://TON-PROJET.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=TA_CLE_SECRETE
-```
-
-Garder la clé privée : `.env` est exclu de Git. Le programme ne lit pas ce fichier
-automatiquement ; exporter les variables dans le terminal qui lancera le chargement :
+Pour le chargeur REST, créer `.env` à partir de `.env.example` si nécessaire, puis
+renseigner l’URL HTTPS du projet et une clé serveur `sb_secret_…` ou legacy
+`service_role`. Ne jamais committer ce fichier.
 
 ```bash
+cp -n .env.example .env
+# Compléter .env localement, puis :
 set -a
 source .env
 set +a
+python -m twin load --dry-run
 python -m twin load --batch-size 500
 ```
 
-Cette commande **écrit réellement dans Supabase**, par lots de 500 lignes maximum,
-puis vérifie les comptages. Les upserts permettent de reprendre après une interruption
-sans doublons. Dans un nouveau terminal, réactiver `.venv` et recharger `.env`.
+Le dry-run valide les fichiers sans réseau ni secrets. Le chargement réel
+effectue des upserts sur `(building_id, timestamp_local)` et vérifie les
+comptages du périmètre. Il peut être relancé sans doublons. RLS est activé sans
+politique publique ; la clé serveur reste côté serveur.
 
-## 6. Vérifier le résultat
+## 7. Vérifier et contribuer
 
-Les logs doivent indiquer les lignes vérifiées. Dans **Table Editor**, pour la
-configuration par défaut et une première ingestion dans une base vide :
+```bash
+python -m unittest discover -s tests -v
+python -m compileall -q twin dashboard app.py tests
+git diff --check
+```
 
-| Table | Contenu | Lignes attendues |
-|---|---|---:|
-| `buildings` | Métadonnées et provenance | 1 |
-| `historical_measurements` | Consommation et météo | 17 544 |
-| `simulation_runs` | Paramètres et provenance de simulation | 1 |
-| `simulated_states` | Occupation et température intérieure simulées | 17 544 |
+`test.ipynb` conserve la justification du choix de Miriam. `python -m twin diagnose`
+reste disponible avec les CSV BDG2 complets. Les tests n’exigent ni les CSV
+complets, ni Supabase : ils utilisent des jeux synthétiques et une API simulée.
 
-Des configurations, sources ou versions de code différentes créent d’autres
-exécutions, avec 17 544 états par exécution sur la période par défaut.
-L’historique du bâtiment est mis à jour par upsert.
-
-## En cas d’erreur
-
-| Erreur | Action |
-|---|---|
-| Variables Supabase requises | Vérifier `.env`, puis refaire `set -a`, `source .env`, `set +a`. |
-| `HTTP 404 / PGRST125` | Retirer tout chemin de `SUPABASE_URL`, puis recharger `.env`. |
-| `HTTP 401` ou `403` | Vérifier la clé serveur, le projet et ses permissions. |
-| Table introuvable | Vérifier que le SQL a été exécuté dans le projet correspondant à l’URL. |
-| Exports absents, incomplets ou modifiés | Relancer `python -m twin prepare`, puis le dry-run. |
-
-Pour signaler un problème, partager la commande et le statut/code d’erreur,
-jamais le contenu de `.env`. [Référence des erreurs API Supabase](https://supabase.com/docs/guides/api/rest/postgrest-error-codes).
-
-## Repères pour contribuer
-
-`twin/__main__.py` reçoit les commandes ; `data.py` charge et valide,
-`pipeline.py` prépare et diagnostique, `simulation.py` simule, `export.py` exporte
-et charge. Le schéma est dans `sql/`, les tests dans `tests/`, les détails dans
+Le contrat de table et les variables sont dans `twin/dataset.py`, l’import COPY
+dans `twin/dump.py`, la préparation dans `twin/pipeline.py` et les exports dans
+`twin/export.py`. La méthode et les vérifications sont détaillées dans
 [docs/methodologie.md](docs/methodologie.md) et [docs/validation.md](docs/validation.md).
-Après une modification de code, lancer les tests et régénérer les exports destinés à l’ingestion.
-
-Les consommations brutes restent en **kWh par intervalle horaire**. Les timestamps
-restent locaux (`US/Central`), avec des ambiguïtés DST à résoudre avant un usage
-en temps réel. L’imputation météo par défaut (`retrospective`) utilise des valeurs
-futures ; le mode `causal` utilise uniquement le passé. L’occupation et la température
-intérieure sont **simulées avec des hypothèses de démonstration**, sans validation
-sur le bâtiment réel.

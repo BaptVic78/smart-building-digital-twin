@@ -1,31 +1,71 @@
-# Vérifications locales du pipeline
+# Vérifications du dataset final — 14 octobre 2026
 
-Exécution sur les fichiers réels du projet, avec Python 3.12 et les dépendances
-figées dans `requirements.txt` (installation isolée dans /tmp).
+Exécution locale sous Python 3.12.7. L’installation complète de `requirements.txt`
+a réussi après correction de `packaging==26.3` en `packaging==25.0` : Streamlit
+1.51.0 exige une version inférieure à 26.
 
-- Préparation : 17544 heures, 0 heures électriques absentes.
-- Consommation : aucune valeur absente, nulle, négative ou infinie; 24 mois complets.
-- Plus longue séquence électrique constante : 3 heures.
-- Météo : 2 heures sans ligne, 2 lignes avec température absente.
-- Températures absentes au total : 4; différence avec le notebook : 0.
-- Mode rétrospectif, trou maximal 3 heures : 4 imputations, 0 températures non résolues.
-- Fuseau des métadonnées : US/Central; 4 étiquettes locales DST ambiguës/inexistantes, conservées sans conversion UTC.
-- Diagnostic exécuté sur 296 bureaux, dont 34 satisfont le filtre strict du notebook.
-- États simulés : 17544; température intérieure de 19.959 à 25.031 °C avec les hypothèses de démonstration.
-- Dry-run : 1 bâtiment, 17 544 mesures historiques, 1 exécution, 17 544 états; lots de 500.
-- 12 tests unitaires/intégration passent, y compris préparation synthétique répétée à l'identique et détection d'exports modifiés.
-- Compilation Python et `git diff --check` réussis; notebook inchangé.
+## Génération sur le dump fourni
 
-Le SQL est préparé mais n'a pas été exécuté sur une base. L'idempotence REST et
-les comptages sont testés sur une API simulée. Aucun accès Supabase, aucune
-ressource distante ni aucun chargement réel. Restent à confirmer les paramètres
-physiques et l'occupation réelle, la sémantique début/fin de l'intervalle compteur
-et le traitement temporel opérationnel autour des changements d'heure.
+Commande : `python -m twin prepare --from-dump donnees.sql`, avec `config.json`.
+Les CSV BDG2 complets ne sont pas présents dans ce checkout ; ils n’ont pas été
+retéléchargés. Le dump sert de source réelle à cette vérification.
 
-## Contrôle avant commits
+- Une seule table `training_measurements`, 25 colonnes, 17 544 lignes.
+- Période : 1er janvier 2016 à 00 h — 31 décembre 2017 à 23 h.
+- Consommation conservée : aucune valeur absente, à zéro, négative ou infinie.
+- Deux heures sans ligne météo et quatre températures originales absentes.
+- Traitement causal, report maximal de trois heures : quatre imputations et
+  aucune température non résolue.
+- Occupation et états thermiques régénérés avec les hypothèses de démonstration.
+- Quatre étiquettes locales DST ambiguës/inexistantes, signalées sans conversion UTC.
+- Les 168 premières heures et 676 heures liées aux événements DST sont exclues
+  de l’entraînement, mais restent dans la table : 16 700 heures exploitables.
+- Partitions : train 8 784 / 8 278 exploitables ; validation 4 344 / 4 175 ;
+  test 4 416 / 4 247.
+- `anomaly_label` : 17 544 NULL ; aucune annotation normale ou anormale inventée.
+- Base SQLite : une seule table utilisateur et `PRAGMA integrity_check = ok`.
+- Dry-run REST : une table, 17 544 lignes, 36 lots maximum de 500.
 
-La suite actuelle comporte 14 tests, y compris les diagnostics HTTP sans secrets
-et les en-têtes des clés serveur modernes/legacy. Les sorties enregistrées du
-notebook ont été actualisées par le contributeur ; le code des cellules est identique.
-Le chargement réel a été réalisé par le contributeur avec une clé sb_secret_….
-L'agent ne lance aucun chargement distant lors de ce contrôle.
+## Vérification PostgreSQL
+
+Un serveur PostgreSQL 16.14 temporaire, accessible uniquement par socket local,
+a été créé pour ce contrôle puis arrêté et supprimé.
+
+- Exécution de `sql/schema.sql`, puis de l’export SQL rempli.
+- Second import du même fichier : toujours 17 544 lignes, aucun doublon.
+- Une seule table dans le schéma public, RLS activé.
+- Même nombre d’annotations NULL et d’heures exploitables que SQLite.
+- Comparaison des 17 544 lignes entre SQLite et PostgreSQL : consommation,
+  décalage d’une heure, moyenne de 168 heures, météo décalée, disponibilité et
+  partition identiques (tolérance numérique 1e-10).
+
+## Tests et tableau de bord
+
+Les **30 tests** de `python -m unittest discover -s tests -v` passent. Ils couvrent :
+
+- l’exclusion de la cible et du futur des décalages et moyennes ;
+- une modification de la cible/météo future qui laisse les entrées antérieures inchangées ;
+- les frontières temporelles, les doublons, les heures absentes et les masques DST ;
+- les annotations inconnues, les contraintes SQLite et l’intégrité des fichiers ;
+- la parité de préparation CSV/COPY sur un jeu synthétique, l’échappement COPY,
+  le rejet de dumps incomplets et l’exclusion des tables auth/storage ;
+- la reproductibilité et la stabilité du simulateur, les modes météo et leur causalité ;
+- le chargement REST idempotent par lots sur une API simulée et les erreurs sans secrets ;
+- la lecture du format unique et le rejet des anciens exports ou métadonnées incohérentes ;
+- Streamlit : ouverture, onglet d’entraînement, filtre des sept derniers jours et
+  écran des dernières observations, sans exception.
+
+La compilation Python, le contrôle statique des imports et `git diff --check`
+réussissent. Le notebook d’exploration est inchangé.
+
+## Limites de cette validation
+
+Aucun accès Supabase n’a été effectué pour cette nouvelle table : les variables
+d’accès ne sont pas configurées dans cette session. Les anciennes tables distantes
+ne sont pas modifiées. Le SQL est vérifié sur PostgreSQL local ; le transport REST
+est vérifié avec une API simulée, pas sur le projet de production.
+
+Aucun modèle prédictif ou détecteur n’est entraîné. Les paramètres thermiques et
+l’occupation réelle ne sont pas validés, et la convention opérationnelle des
+intervalles compteur reste à confirmer. Les heures exploitables sont un critère
+de disponibilité, pas une preuve d’absence d’anomalies.
