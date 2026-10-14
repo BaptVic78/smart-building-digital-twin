@@ -182,7 +182,10 @@ def prepare(config, dump_path=None):
 def diagnose(config):
     import os
 
-    cache = Path(config["output"]) / ".matplotlib"
+    output = Path(
+        config.get("diagnostics_output", Path(config["output"]) / "diagnostics")
+    )
+    cache = output / ".matplotlib"
     cache.mkdir(parents=True, exist_ok=True)
     os.environ.setdefault("MPLCONFIGDIR", str(cache.resolve()))
     import matplotlib
@@ -191,7 +194,6 @@ def diagnose(config):
     import matplotlib.pyplot as plt
 
     meta, building, electric, weather, absent = load(config, diagnostic=True)
-    output = Path(config["output"]) / "diagnostics"
     output.mkdir(parents=True, exist_ok=True)
     rows = []
     for b in electric:

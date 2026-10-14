@@ -10,6 +10,9 @@ température intérieure et l’énergie thermique HVAC sont simulées et signal
 comme telles. Le dataset prépare la prévision à une heure ; aucun modèle
 prédictif ni détecteur d’anomalies n’est encore entraîné.
 
+Le plan des dossiers et les fichiers supprimables sont décrits dans
+[docs/organisation.md](docs/organisation.md).
+
 ## 1. Installer
 
 Depuis la racine du dépôt, utiliser Python 3.12 :
@@ -26,10 +29,11 @@ Deux sources sont possibles. Une seule des deux commandes `prepare` est nécessa
 
 ### Depuis l’export Supabase existant
 
-Placer l’export de données PostgreSQL au format COPY dans `donnees.sql`, à la racine :
+Placer l’export de données PostgreSQL au format COPY dans
+`data/imports/supabase/donnees.sql` (créer le dossier si nécessaire) :
 
 ```bash
-python -m twin prepare --from-dump donnees.sql
+python -m twin prepare --from-dump data/imports/supabase/donnees.sql
 python -m twin load --dry-run
 ```
 
@@ -68,7 +72,7 @@ python -m twin prepare
 Sauter le clone si `../bdg2-source` existe déjà. Les sources, paramètres, dates de
 séparation et dossier de sortie sont configurables dans [config.json](config.json).
 
-## 3. Fichiers produits dans `outputs/`
+## 3. Fichiers produits dans `outputs/dataset/`
 
 | Fichier | Utilisation |
 |---|---|
@@ -136,9 +140,9 @@ import json
 import sqlite3
 import pandas as pd
 
-with open("outputs/dataset_metadata.json", encoding="utf-8") as source:
+with open("outputs/dataset/dataset_metadata.json", encoding="utf-8") as source:
     metadata = json.load(source)
-with sqlite3.connect("outputs/training_measurements.sqlite") as connection:
+with sqlite3.connect("outputs/dataset/training_measurements.sqlite") as connection:
     train = pd.read_sql_query(
         "SELECT * FROM training_measurements "
         "WHERE training_split = 'train' AND is_training_ready = 1 "
@@ -171,7 +175,7 @@ des hypothèses de démonstration non calibrées sur le bâtiment réel.
 
 Deux possibilités :
 
-- Importer `outputs/training_measurements.sql` avec un client PostgreSQL. Le fichier
+- Importer `outputs/dataset/training_measurements.sql` avec un client PostgreSQL. Le fichier
   contient le schéma et toutes les données dans une transaction.
 - Installer [sql/schema.sql](sql/schema.sql) dans SQL Editor, puis utiliser le
   chargeur REST ci-dessous.
@@ -208,8 +212,9 @@ python -m compileall -q twin dashboard app.py tests
 git diff --check
 ```
 
-`test.ipynb` conserve la justification du choix de Miriam. `python -m twin diagnose`
-reste disponible avec les CSV BDG2 complets. Les tests n’exigent ni les CSV
+[Le notebook de sélection](notebooks/01_selection_batiment.ipynb) conserve la
+justification du choix de Miriam et résout ses chemins depuis la racine du dépôt. `python -m twin diagnose`
+reste disponible avec les CSV BDG2 complets et écrit dans `outputs/diagnostics/`. Les tests n’exigent ni les CSV
 complets, ni Supabase : ils utilisent des jeux synthétiques et une API simulée.
 
 Le contrat de table et les variables sont dans `twin/dataset.py`, l’import COPY

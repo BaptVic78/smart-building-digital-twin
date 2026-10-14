@@ -6,7 +6,7 @@ a réussi après correction de `packaging==26.3` en `packaging==25.0` : Streamli
 
 ## Génération sur le dump fourni
 
-Commande : `python -m twin prepare --from-dump donnees.sql`, avec `config.json`.
+Commande : `python -m twin prepare --from-dump data/imports/supabase/donnees.sql`, avec `config.json`.
 Les CSV BDG2 complets ne sont pas présents dans ce checkout ; ils n’ont pas été
 retéléchargés. Le dump sert de source réelle à cette vérification.
 
@@ -56,7 +56,9 @@ Les **30 tests** de `python -m unittest discover -s tests -v` passent. Ils couvr
   écran des dernières observations, sans exception.
 
 La compilation Python, le contrôle statique des imports et `git diff --check`
-réussissent. Le notebook d’exploration est inchangé.
+réussissent. Le code de sélection du notebook est conservé ; son fichier a été déplacé dans
+`notebooks/01_selection_batiment.ipynb` et ses chemins de données adaptés. Les
+sorties historiques sont conservées, sans réexécution complète faute de CSV BDG2.
 
 ## Limites de cette validation
 

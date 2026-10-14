@@ -21,9 +21,13 @@ de juillet à décembre 2017. Sur l’export SQL fourni, 16 700 heures sont tech
 exploitables (8 278 / 4 175 / 4 247 par partition). Toutes les annotations d’anomalie
 restent NULL : l’historique n’est pas déclaré entièrement normal.
 
-`python -m twin prepare --from-dump donnees.sql` a généré la base SQLite, le SQL
+`python -m twin prepare --from-dump data/imports/supabase/donnees.sql` a généré la base SQLite, le SQL
 PostgreSQL rempli, les exports CSV/JSON et les rapports. Le dashboard lit ce
 format et expose les données d’entraînement. Le notebook d’exploration est conservé.
+Le dépôt a ensuite été rangé : le notebook est dans `notebooks/01_selection_batiment.ipynb`,
+les exports sources dans `data/imports/supabase/`, les résultats actifs dans
+`outputs/dataset/` et le portfolio local dans `docs/references/`. Les dépendances
+historiques sont archivées dans `docs/archives/`. Voir [organisation.md](organisation.md).
 Les modèles prédictifs, la détection, les injections et les recommandations
 restent à développer. Les hypothèses de simulation thermique et d’occupation ne
 sont pas calibrées sur le bâtiment réel.
@@ -152,7 +156,10 @@ Le notebook actuel utilise **l'électricité brute**, pas le fichier cleaned. Le
 
 ### Notebook de référence
 
-**`Miriam_2016-2017.ipynb`** remplace les explorations antérieures `test.ipynb` et `test(1).ipynb` pour la sélection du bâtiment. Toutes ses cellules de code possèdent des compteurs d'exécution et aucune erreur n'est enregistrée dans la version examinée.
+Le notebook versionné est maintenant [notebooks/01_selection_batiment.ipynb](../notebooks/01_selection_batiment.ipynb),
+anciennement nommé `test.ipynb`. Le nom `Miriam_2016-2017.ipynb` désignait la version
+examinée dans le contexte du 2 octobre. Ses sorties historiques sont conservées ;
+le rangement du 14 octobre adapte les chemins sans réexécuter l’analyse complète.
 
 L'exploration initiale portait sur `Panther_office_Karla`. Le choix actuel est **`Hog_office_Miriam`**, site **`Hog`**, sur les deux années complètes 2016–2017.
 

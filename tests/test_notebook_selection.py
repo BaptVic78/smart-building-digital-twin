@@ -7,7 +7,7 @@ import unittest
 import numpy as np
 import pandas as pd
 
-NOTEBOOK = Path(__file__).resolve().parents[1] / 'test.ipynb'
+NOTEBOOK = Path(__file__).resolve().parents[1] / 'notebooks' / '01_selection_batiment.ipynb'
 
 
 class CoverageTests(unittest.TestCase):
