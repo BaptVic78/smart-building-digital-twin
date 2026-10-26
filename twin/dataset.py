@@ -6,8 +6,8 @@ import pandas as pd
 from .data import treat_temperature
 
 
-TABLE_NAME = "training_measurements"
-SCHEMA_VERSION = 2
+TABLE_NAME = "measurements"
+SCHEMA_VERSION = 3
 COLUMN_TYPES = {
     "building_id": "text",
     "timestamp_local": "timestamp",

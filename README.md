@@ -2,7 +2,7 @@
 
 Préparation des données du bâtiment de bureaux **Hog_office_Miriam** sur
 2016–2017 et tableau de bord Streamlit. La base finale contient **une seule table
-`training_measurements` : une ligne par bâtiment et par heure**, soit 17 544 lignes
+`measurements` : une ligne par bâtiment et par heure**, soit 17 544 lignes
 et 25 colonnes avec la configuration fournie.
 
 La consommation et la météo proviennent des historiques BDG2. L’occupation, la
@@ -77,10 +77,10 @@ séparation et dossier de sortie sont configurables dans [config.json](config.js
 
 | Fichier | Utilisation |
 |---|---|
-| `training_measurements.sqlite` | Base locale complète, avec une seule table |
-| `training_measurements.sql` | Schéma PostgreSQL et données, import transactionnel avec upserts |
-| `training_measurements.csv` | Analyse et échange de données |
-| `training_measurements.json` | Chargement REST Supabase et lecture du dashboard |
+| `measurements.sqlite` | Base locale complète, avec une seule table |
+| `measurements.sql` | Schéma PostgreSQL et données, import transactionnel avec upserts |
+| `measurements.csv` | Analyse et échange de données |
+| `measurements.json` | Chargement REST Supabase et lecture du dashboard |
 | `dataset_metadata.json` | Liste des entrées du modèle, cible, provenance et paramètres de simulation |
 | `quality_report.json` | Comptages, qualité et disponibilité des lignes pour l’entraînement |
 | `manifest.json` | Empreintes des six fichiers ; un export modifié ou incomplet est refusé |
@@ -143,9 +143,9 @@ import pandas as pd
 
 with open("outputs/dataset/dataset_metadata.json", encoding="utf-8") as source:
     metadata = json.load(source)
-with sqlite3.connect("outputs/dataset/training_measurements.sqlite") as connection:
+with sqlite3.connect("outputs/dataset/measurements.sqlite") as connection:
     train = pd.read_sql_query(
-        "SELECT * FROM training_measurements "
+        "SELECT * FROM measurements "
         "WHERE training_split = 'train' AND is_training_ready = 1 "
         "ORDER BY timestamp_local", connection,
     )
@@ -174,21 +174,25 @@ des hypothèses de démonstration non calibrées sur le bâtiment réel.
 
 ## 6. Charger la table finale dans Supabase
 
+**Transition de schéma :** le code local utilise `measurements`. La base distante
+existante doit d’abord renommer `public.training_measurements` en
+`measurements`, puis exécuter `sql/schema.sql` (voir le contrat ci-dessous).
+Pour une installation neuve, utiliser `sql/schema.sql`, qui crée aussi les tables
+de rejeux, prédictions et alertes. Voir [le contrat des tables](docs/schema_rejeu.md).
+
+
 Deux possibilités :
 
-- Importer `outputs/dataset/training_measurements.sql` avec un client PostgreSQL. Le fichier
+- Importer `outputs/dataset/measurements.sql` avec un client PostgreSQL. Le fichier
   contient le schéma et toutes les données dans une transaction.
 - Installer [sql/schema.sql](sql/schema.sql) dans SQL Editor, puis utiliser le
   chargeur REST ci-dessous.
 
-Ces deux chemins créent uniquement `public.training_measurements`. Ils ne
-suppriment aucune ancienne table. Après vérification du chargement, la migration
-[sql/archive_legacy_tables.sql](sql/archive_legacy_tables.sql) déplace les quatre
-anciennes tables vers le schéma `archive`, avec leurs données et relations. Elle
-refuse de déplacer les sources si les mesures finales diffèrent et ne remplace
-jamais une archive existante. Une seule table reste active dans `public`.
+L’export rempli crée uniquement `public.measurements` ; `schema.sql` crée aussi
+les trois tables de suivi. Aucun des deux ne renomme l'ancienne table.
 
-Cette migration a été effectuée sur le projet Supabase le 14 octobre 2026 :
+L’archivage historique a été effectué sur Supabase le 14 octobre 2026,
+sous l’ancien nom `training_measurements` :
 17 544 lignes, 25 colonnes et 16 700 heures exploitables pour l’entraînement.
 Les quatre tables sources sont conservées dans `archive`.
 

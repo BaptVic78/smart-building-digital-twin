@@ -108,11 +108,12 @@ class DatasetTests(unittest.TestCase):
 
     def test_schema_file_stays_in_sync_with_populated_export(self):
         schema = (Path(__file__).resolve().parents[1] / "sql/schema.sql").read_text()
+        # Le schéma complet doit conserver exactement le contrat des exports.
+        measurement_schema = schema.split("-- Tables de suivi.", 1)[0]
         self.assertEqual(
-            schema,
-            "-- Table finale unique. Aucun DROP des anciennes tables.\nbegin;\n"
-            + database_schema()
-            + "commit;\n",
+            measurement_schema,
+            "-- Installation neuve : mesures et suivi des rejeux.\nbegin;\n"
+            + database_schema() + "\n",
         )
 
     def test_rejects_invalid_ready_flag_and_labels(self):

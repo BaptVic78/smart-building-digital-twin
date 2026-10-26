@@ -1,0 +1,69 @@
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "tertiaryColor": "#ffffff", "attributeBackgroundColorOdd": "#ffffff", "attributeBackgroundColorEven": "#ffffff"}}}%%
+erDiagram
+    direction LR
+    MEASUREMENTS ||--o{ PREDICTIONS : concerne
+    REPLAY_RUNS ||--o{ PREDICTIONS : produit
+    PREDICTIONS ||--o| ALERTS : declenche
+
+    MEASUREMENTS {
+        text building_id PK
+        timestamp timestamp_local PK
+        float consumption_kwh
+        float outdoor_temperature_processed_c
+        int occupants
+        float indoor_temperature_c
+        float hvac_thermal_energy_kwh
+        boolean context_is_simulated
+        int hour
+        int dayofweek
+        int month
+        boolean is_weekend
+        float consumption_lag_1h_kwh
+        float consumption_lag_24h_kwh
+        float consumption_lag_168h_kwh
+        float consumption_mean_24h_kwh
+        float consumption_mean_168h_kwh
+        float outdoor_temperature_lag_1h_c
+        boolean temperature_imputed
+        boolean weather_row_present
+        boolean electricity_row_present
+        boolean dst_time_issue
+        text training_split
+        boolean is_training_ready
+        int anomaly_label
+    }
+    REPLAY_RUNS {
+        uuid run_id PK
+        text building_id
+        text status
+        timestamp replay_start
+        timestamp replay_end
+        timestamp last_processed_at
+        text model_version
+        text model_sha256
+        text dataset_sha256
+        jsonb feature_columns
+        jsonb alert_rule
+        timestamptz started_at
+        timestamptz finished_at
+    }
+    PREDICTIONS {
+        uuid run_id PK, FK
+        text building_id PK, FK
+        timestamp timestamp_local PK, FK
+        float predicted_kwh
+        float actual_kwh
+        float residual_kwh
+        timestamptz predicted_at
+        timestamptz evaluated_at
+    }
+    ALERTS {
+        uuid run_id PK, FK
+        text building_id PK, FK
+        timestamp timestamp_local PK, FK
+        text alert_type
+        float threshold_kwh
+        jsonb context
+        jsonb hypotheses
+        timestamptz triggered_at
+    }

@@ -234,7 +234,7 @@ def save_artifacts(data, forecast_model, alert_rule, output):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dataset", type=Path, default=ROOT / "outputs/dataset/training_measurements.csv")
+    parser.add_argument("--dataset", type=Path, default=ROOT / "outputs/dataset/measurements.csv")
     parser.add_argument("--output", type=Path, default=ROOT / "outputs/models")
     parser.add_argument("--evaluate-test", action="store_true", help="Afficher aussi l'évaluation finale, sans réglage sur test")
     args = parser.parse_args()

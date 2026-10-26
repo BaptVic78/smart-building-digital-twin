@@ -9,6 +9,7 @@ import pandas as pd
 from .data import load, join_weather, treat_temperature, quality
 from .dataset import (
     FEATURE_COLUMNS,
+    SCHEMA_VERSION,
     SIMULATED_COLUMNS,
     TABLE_NAME,
     build_dataset,
@@ -136,7 +137,7 @@ def prepare(config, dump_path=None):
     dataset = build_dataset(history, states, building, config)
     report["training"] = training_summary(dataset)
     metadata = {
-        "schema_version": 2,
+        "schema_version": SCHEMA_VERSION,
         "table": TABLE_NAME,
         "row_count": len(dataset),
         "building": building_info,

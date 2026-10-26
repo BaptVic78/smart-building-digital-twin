@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from twin.dataset import FEATURE_COLUMNS, TABLE_NAME, build_dataset, training_summary
+from twin.dataset import FEATURE_COLUMNS, SCHEMA_VERSION, TABLE_NAME, build_dataset, training_summary
 
 
 CONFIG = json.loads((Path(__file__).resolve().parents[1] / "config.json").read_text())
@@ -47,7 +47,7 @@ def input_frames(periods=200, start="2016-01-01 00:00:00"):
 def dataset_fixture(periods=200, start="2016-01-01 00:00:00"):
     frame = build_dataset(*input_frames(periods, start))
     metadata = {
-        "schema_version": 2,
+        "schema_version": SCHEMA_VERSION,
         "table": TABLE_NAME,
         "row_count": len(frame),
         "building": {

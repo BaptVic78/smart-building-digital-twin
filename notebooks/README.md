@@ -3,7 +3,7 @@
 | Notebook | Rôle | Entrées | Sorties |
 |---|---|---|---|
 | `01_selection_batiment.ipynb` | Comparaison des bureaux et choix de Hog_office_Miriam | CSV BDG2 dans `data/` | Analyses exploratoires |
-| `03_modeles_reference.ipynb` | Ridge, XGBoost, résidus et calibration des alertes | `outputs/dataset/training_measurements.csv` | `outputs/models/` |
+| `03_modeles_reference.ipynb` | Ridge, XGBoost, résidus et calibration des alertes | `outputs/dataset/measurements.csv` | `outputs/models/` |
 
 Ouvrir les notebooks depuis la racine ou depuis `notebooks/`.
 La numérotation existante est conservée ; aucun notebook 02 n'est nécessaire.

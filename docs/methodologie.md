@@ -148,7 +148,7 @@ secrets.
 Le dashboard utilise les exports de cette table unique et les métadonnées. Il
 présente les historiques et la simulation, pas un flux temps réel.
 
-Après import, `sql/archive_legacy_tables.sql` compare les clés, consommations et
+Après import, le script historique d’archivage (retiré du dépôt) compare les clés, consommations et
 indicateurs de présence des sources à la table finale. En cas d’écart, la
 transaction échoue. Sinon, les quatre anciennes tables sont déplacées dans le
 schéma `archive` : leurs données, clés et relations sont conservées, et aucune
@@ -156,3 +156,12 @@ archive existante n’est écrasée. La table finale reste seule dans `public`.
 Les commandes de restauration sont indiquées en commentaires dans la migration.
 Le 14 octobre 2026, les 17 544 lignes distantes et leurs 25 colonnes ont été
 comparées à l’export local après le chargement réel par lots.
+
+## Évolution locale du schéma — 26 octobre 2026
+
+Le dataset local est renommé `measurements`, sans changement des 25 colonnes,
+des valeurs ou des règles temporelles. Les modèles Ridge/XGBoost et les règles
+sont déjà entraînés/calibrés ; les mentions antérieures décrivent l'état historique.
+La base Supabase reste inchangée à ce stade. Le schéma cible ajoute `replay_runs`,
+`predictions` et `alerts`. La migration et le contrat de disponibilité sont
+présentés dans [schema_rejeu.md](schema_rejeu.md).

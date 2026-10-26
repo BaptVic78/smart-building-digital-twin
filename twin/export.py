@@ -130,9 +130,9 @@ def database_schema(dialect="postgres"):
         ]
     schema = f"create table if not exists {table} (\n" + ",\n".join(fields) + "\n);\n"
     schema += (
-        f"create index if not exists training_time_idx on {table}(timestamp_local);\n"
+        f"create index if not exists measurements_time_idx on {table}(timestamp_local);\n"
     )
-    schema += f"create index if not exists training_split_idx on {table}(training_split, is_training_ready);\n"
+    schema += f"create index if not exists measurements_split_idx on {table}(training_split, is_training_ready);\n"
     if dialect == "postgres":
         schema += f"alter table {table} enable row level security;\n"
     return schema

@@ -32,7 +32,7 @@ La base Supabase a ensuite été actualisée via la session CLI : une seule tabl
 `public.training_measurements` contient les 17 544 lignes finales. Les quatre
 anciennes tables ont été conservées dans le schéma `archive`, après contrôle des
 mesures. Les 25 colonnes de toutes les lignes ont été comparées aux exports locaux.
-La migration réversible est versionnée dans `sql/archive_legacy_tables.sql`.
+Le script ponctuel d’archivage a été retiré du dépôt après utilisation.
 Les modèles prédictifs, la détection, les injections et les recommandations
 restent à développer. Les hypothèses de simulation thermique et d’occupation ne
 sont pas calibrées sur le bâtiment réel.

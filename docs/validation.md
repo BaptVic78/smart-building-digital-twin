@@ -74,7 +74,7 @@ en mémoire, sans création de fichier `.env` ni publication de secret.
 - Comparaison paginée des 17 544 lignes et de toutes leurs colonnes à l’export
   local : concordance à tolérance numérique 1e-12 ; écart maximal observé
   4,98e-14 dans la représentation numérique REST.
-- Migration `sql/archive_legacy_tables.sql` exécutée après vérification : les
+- Migration le script historique d’archivage (retiré du dépôt) exécutée après vérification : les
   quatre sources sont conservées dans `archive` avec les mêmes comptages
   (1 bâtiment, 17 544 historiques, 1 exécution, 17 544 états simulés).
 - Les relations de clés étrangères des archives restent validées.
@@ -86,3 +86,12 @@ Aucun modèle prédictif ou détecteur n’est entraîné. Les paramètres therm
 l’occupation réelle ne sont pas validés, et la convention opérationnelle des
 intervalles compteur reste à confirmer. Les heures exploitables sont un critère
 de disponibilité, pas une preuve d’absence d’anomalies.
+
+## Évolution locale du schéma — 26 octobre 2026
+
+Le dataset local est renommé `measurements`, sans changement des 25 colonnes,
+des valeurs ou des règles temporelles. Les modèles Ridge/XGBoost et les règles
+sont déjà entraînés/calibrés ; les mentions antérieures décrivent l'état historique.
+La base Supabase reste inchangée à ce stade. Le schéma cible ajoute `replay_runs`,
+`predictions` et `alerts`. La migration et le contrat de disponibilité sont
+présentés dans [schema_rejeu.md](schema_rejeu.md).

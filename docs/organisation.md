@@ -17,8 +17,7 @@ smart-building-digital-twin/
 │   ├── 03_modeles_reference.ipynb     modèles et calibration des alertes
 │   └── 01_selection_batiment.ipynb    exploration et justification du choix de Miriam
 ├── sql/
-│   ├── schema.sql                    schéma PostgreSQL de la table finale
-│   └── archive_legacy_tables.sql     migration réversible des quatre tables sources
+│   └── schema.sql                    schéma PostgreSQL complet
 ├── docs/
 │   ├── organisation.md               ce plan et les possibilités de nettoyage
 │   ├── contexte.md                   cadrage, décisions et historique du projet
@@ -120,3 +119,12 @@ l'évaluation, les résidus et la calibration. Le notebook 03 appelle ces foncti
 et conserve la visualisation. L'entraînement autonome s'exécute avec
 `python -m twin.training` ; l'évaluation sur test est facultative
 (`--evaluate-test`). Le rejeu sera traité séparément.
+
+## Évolution locale du schéma — 26 octobre 2026
+
+Le dataset local est renommé `measurements`, sans changement des 25 colonnes,
+des valeurs ou des règles temporelles. Les modèles Ridge/XGBoost et les règles
+sont déjà entraînés/calibrés ; les mentions antérieures décrivent l'état historique.
+La base Supabase reste inchangée à ce stade. Le schéma cible ajoute `replay_runs`,
+`predictions` et `alerts`. La procédure de transition et le contrat de disponibilité sont
+présentés dans [schema_rejeu.md](schema_rejeu.md).
