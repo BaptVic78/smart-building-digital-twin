@@ -1,9 +1,10 @@
 # Jumeau numérique énergétique — PFE
 
 Préparation des données du bâtiment de bureaux **Hog_office_Miriam** sur
-2016–2017 et tableau de bord Streamlit. La base finale contient **une seule table
-`measurements` : une ligne par bâtiment et par heure**, soit 17 544 lignes
-et 25 colonnes avec la configuration fournie.
+2016–2017 et tableau de bord Streamlit. Le dataset contient la table
+**`measurements` : une ligne par bâtiment et par heure**, soit 17 544 lignes
+et 25 colonnes avec la configuration fournie. Le schéma Supabase ajoute
+`replay_runs`, `predictions` et `alerts` pour le futur suivi des rejeux.
 
 La consommation et la météo proviennent des historiques BDG2. L’occupation, la
 température intérieure et l’énergie thermique HVAC sont simulées et signalées
@@ -172,33 +173,25 @@ L’écran de suivi montre les derniers historiques exportés ; aucun flux temps
 réel n’est connecté. Les températures intérieures, l’occupation et le HVAC sont
 des hypothèses de démonstration non calibrées sur le bâtiment réel.
 
-## 6. Charger la table finale dans Supabase
+## 6. Installer la base Supabase et charger les données
 
-**Transition de schéma :** le code local utilise `measurements`. La base distante
-existante doit d’abord renommer `public.training_measurements` en
-`measurements`, puis exécuter `sql/schema.sql` (voir le contrat ci-dessous).
-Pour une installation neuve, utiliser `sql/schema.sql`, qui crée aussi les tables
-de rejeux, prédictions et alertes. Voir [le contrat des tables](docs/schema_rejeu.md).
+### Nouvelle installation
 
+1. Créer un projet Supabase et ouvrir son **SQL Editor**.
+2. Copier **tout le contenu** de [sql/schema.sql](sql/schema.sql) et l'exécuter.
+   Ce fichier crée les quatre tables, les clés, les contraintes et active RLS.
+3. Générer le dataset local avec `python -m twin prepare` (section 2).
+4. Configurer les accès serveur et charger les mesures avec les commandes ci-dessous.
 
-Deux possibilités :
+Le fichier `schema.sql` crée la structure ; il ne contient aucune mesure.
+Les tables `replay_runs`, `predictions` et `alerts` restent vides jusqu'au rejeu.
+Le contrat est détaillé dans [docs/schema_rejeu.md](docs/schema_rejeu.md).
 
-- Importer `outputs/dataset/measurements.sql` avec un client PostgreSQL. Le fichier
-  contient le schéma et toutes les données dans une transaction.
-- Installer [sql/schema.sql](sql/schema.sql) dans SQL Editor, puis utiliser le
-  chargeur REST ci-dessous.
+### Configuration et chargement
 
-L’export rempli crée uniquement `public.measurements` ; `schema.sql` crée aussi
-les trois tables de suivi. Aucun des deux ne renomme l'ancienne table.
-
-L’archivage historique a été effectué sur Supabase le 14 octobre 2026,
-sous l’ancien nom `training_measurements` :
-17 544 lignes, 25 colonnes et 16 700 heures exploitables pour l’entraînement.
-Les quatre tables sources sont conservées dans `archive`.
-
-Pour le chargeur REST, créer `.env` à partir de `.env.example` si nécessaire, puis
-renseigner l’URL HTTPS du projet et une clé serveur `sb_secret_…` ou legacy
-`service_role`. Ne jamais committer ce fichier.
+Créer `.env` à partir de `.env.example` si nécessaire, puis renseigner
+`SUPABASE_URL` et `SUPABASE_SERVICE_ROLE_KEY` avec l'URL du projet et une clé
+serveur `sb_secret_…` ou legacy `service_role`. Ne jamais committer ce fichier.
 
 ```bash
 cp -n .env.example .env
@@ -210,16 +203,48 @@ python -m twin load --dry-run
 python -m twin load --batch-size 500
 ```
 
-Le dry-run valide les fichiers sans réseau ni secrets. Le chargement réel
-effectue des upserts sur `(building_id, timestamp_local)` et vérifie les
-comptages du périmètre. Il peut être relancé sans doublons. RLS est activé sans
-politique publique ; la clé serveur reste côté serveur.
+Le dry-run valide les exports locaux sans connexion réseau. Le chargement réel
+remplit uniquement `measurements`, par upserts sur `(building_id, timestamp_local)`.
+Il peut être relancé sans doublons pour charger le même dataset. Les accès restent
+côté Python serveur : aucune politique publique RLS n'est créée.
 
-Une session Supabase CLI authentifiée peut installer le petit schéma avec
-`supabase db query --linked --project-ref <PROJECT_REF> --file sql/schema.sql`,
-puis exécuter le fichier d’archivage après chargement. L’import SQL rempli fait
-environ 4 Mo : l’API de gestion l’a refusé avec HTTP 413. Utiliser un client
-PostgreSQL direct ou le chargeur REST par lots pour les données.
+Alternative pour charger les données : après installation de `schema.sql`,
+importer `outputs/dataset/measurements.sql` avec un client PostgreSQL.
+Cet export contient uniquement le schéma et les données de `measurements` ;
+il ne remplace pas l'installation des trois tables de suivi.
+
+### Vérification après installation
+
+Dans le SQL Editor :
+
+```sql
+select count(*) as measurements,
+       count(*) filter (where is_training_ready) as ready
+from public.measurements;
+
+select tablename, rowsecurity
+from pg_tables
+where schemaname = 'public'
+  and tablename in ('measurements', 'replay_runs', 'predictions', 'alerts');
+```
+
+Avec les sources et la configuration fournies, le résultat attendu est
+**17 544 mesures**, dont **16 700 exploitables**, et quatre tables avec RLS activé.
+
+### Projet existant
+
+Le renommage en `measurements` et la présence des quatre tables ont été signalés
+après l'exécution du script ponctuel dans le SQL Editor le 26 octobre 2026.
+Il n'est donc pas nécessaire de refaire le renommage sur ce projet.
+Les quatre anciennes tables sources restent dans le schéma `archive`, selon
+la validation du 14 octobre 2026 ; elles ne sont pas nécessaires à une installation neuve.
+
+Si une autre base possède encore `training_measurements`, suivre la procédure
+pour l'ancien nom dans [docs/schema_rejeu.md](docs/schema_rejeu.md) avant de
+charger les données. `schema.sql` ne renomme pas une table existante.
+
+Le dashboard et l'entraînement lisent encore les exports locaux. Le téléchargement
+d'un snapshot depuis Supabase et l'écriture des résultats de rejeu restent à implémenter.
 
 ## 7. Vérifier et contribuer
 

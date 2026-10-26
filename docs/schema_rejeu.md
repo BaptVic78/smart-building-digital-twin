@@ -3,11 +3,14 @@
 ## État de cette évolution
 
 Le code et les exports locaux utilisent désormais `measurements` (format 3).
-La base distante n'a pas été modifiée : elle utilise encore
-`training_measurements`. Ne pas lancer le chargement réel avant la migration.
+Le 26 octobre 2026, l'utilisateur a exécuté le script ponctuel d'application dans
+le SQL Editor et signalé la présence des quatre tables. Le renommage n'est pas
+à refaire sur ce projet. Les contrôles SQL de la section 6 du README permettent
+de vérifier les effectifs et RLS.
 
 `sql/schema.sql` est la référence unique du schéma complet, à modifier directement.
-Pour la base existante, vérifier d'abord que seule `training_measurements` existe,
+Pour une autre base utilisant encore l'ancien nom, vérifier d'abord que seule
+`training_measurements` existe,
 puis effectuer le renommage et créer les tables de suivi dans une transaction :
 
 ```sql
