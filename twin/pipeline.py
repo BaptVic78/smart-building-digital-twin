@@ -195,11 +195,13 @@ def diagnose(config):
 
     meta, building, electric, weather, absent = load(config, diagnostic=True)
     output.mkdir(parents=True, exist_ok=True)
+    monthly_output = output / "mensuel"
+    monthly_output.mkdir(parents=True, exist_ok=True)
     rows = []
     for b in electric:
         q = quality(electric[b])
         monthly = q.pop("monthly")
-        pd.DataFrame(monthly).to_csv(output / f"{b}_monthly.csv", index=False)
+        pd.DataFrame(monthly).to_csv(monthly_output / f"{b}_monthly.csv", index=False)
         rows.append({"building_id": b, **q})
     pd.DataFrame(rows).sort_values(
         ["eligible_full_period", "missing", "zeros", "building_id"],

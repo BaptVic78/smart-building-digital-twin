@@ -7,8 +7,9 @@ et 25 colonnes avec la configuration fournie.
 
 La consommation et la météo proviennent des historiques BDG2. L’occupation, la
 température intérieure et l’énergie thermique HVAC sont simulées et signalées
-comme telles. Le dataset prépare la prévision à une heure ; aucun modèle
-prédictif ni détecteur d’anomalies n’est encore entraîné.
+comme telles. Le dataset prépare la prévision à une heure ; les modèles Ridge et XGBoost sont entraînés dans
+`notebooks/03_modeles_reference.ipynb`. Une règle d’alerte sur les résidus
+est calibrée sur validation ; le rejeu du test reste à implémenter.
 
 Le plan des dossiers et les fichiers supprimables sont décrits dans
 [docs/organisation.md](docs/organisation.md).
@@ -226,10 +227,27 @@ git diff --check
 
 [Le notebook de sélection](notebooks/01_selection_batiment.ipynb) conserve la
 justification du choix de Miriam et résout ses chemins depuis la racine du dépôt. `python -m twin diagnose`
-reste disponible avec les CSV BDG2 complets et écrit dans `outputs/diagnostics/`. Les tests n’exigent ni les CSV
+reste disponible avec les CSV BDG2 complets et écrit dans `outputs/selection_batiment/`. Les tests n’exigent ni les CSV
 complets, ni Supabase : ils utilisent des jeux synthétiques et une API simulée.
 
 Le contrat de table et les variables sont dans `twin/dataset.py`, l’import COPY
 dans `twin/dump.py`, la préparation dans `twin/pipeline.py` et les exports dans
 `twin/export.py`. La méthode et les vérifications sont détaillées dans
 [docs/methodologie.md](docs/methodologie.md) et [docs/validation.md](docs/validation.md).
+
+## Entraînement et calibration
+
+Les calculs du notebook sont centralisés dans `twin/training.py`.
+Depuis la racine, avec l'environnement Python activé :
+
+```bash
+python -m twin.training
+# Évaluation finale facultative, sans ajustement sur test :
+python -m twin.training --evaluate-test
+```
+
+La commande conserve les 13 variables, les partitions temporelles et les paramètres
+Ridge/XGBoost. Elle remplace le modèle et la règle dans `outputs/models/`.
+`--dataset` et `--output` permettent de choisir d'autres chemins.
+Le notebook `notebooks/03_modeles_reference.ipynb` appelle les mêmes fonctions
+pour afficher les tableaux et les graphiques. Le rejeu n'est pas encore implémenté.

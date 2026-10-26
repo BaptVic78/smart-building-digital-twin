@@ -14,6 +14,7 @@ smart-building-digital-twin/
 ├── dashboard/                        lecture des données pour l’interface
 ├── tests/                            vérifications automatisées
 ├── notebooks/
+│   ├── 03_modeles_reference.ipynb     modèles et calibration des alertes
 │   └── 01_selection_batiment.ipynb    exploration et justification du choix de Miriam
 ├── sql/
 │   ├── schema.sql                    schéma PostgreSQL de la table finale
@@ -34,7 +35,7 @@ smart-building-digital-twin/
 │   └── weather/                      météo BDG2 si téléchargée
 └── outputs/                          résultats générés, exclus de Git
     ├── dataset/                      base finale, exports, métadonnées et manifeste
-    ├── diagnostics/                  graphiques et diagnostics si exécutés
+    ├── selection_batiment/                  graphiques et diagnostics si exécutés
     ├── deployment/                   rapport de vérification du chargement distant
     └── archives/                     anciennes métadonnées de génération
 ```
@@ -66,7 +67,7 @@ commandes correspondantes sont disponibles. Le portfolio PDF dans
 | `__pycache__/`, `.ruff_cache/`, `.pytest_cache/`, `.ipynb_checkpoints/`, `.DS_Store` | Caches ou métadonnées locales ; supprimables et exclus de Git |
 | `docs/archives/requirements-notebook-original.txt` | Ancien état de dépendances, non utilisé ; supprimable si l’historique n’est plus souhaité |
 | `data/imports/supabase/structure.sql` | Ancien schéma à quatre tables ; facultatif pour la nouvelle préparation |
-| `outputs/diagnostics/` | Graphiques et diagnostics régénérables, si le dossier existe |
+| `outputs/selection_batiment/` | Graphiques et diagnostics régénérables, si le dossier existe |
 | `outputs/dataset/` complet | Régénérable depuis les sources ; utilisé actuellement par l’application |
 | `.venv/` | Recréable depuis `requirements.txt` ; conserver pour continuer à lancer le projet immédiatement |
 
@@ -86,3 +87,36 @@ python -m twin load --dry-run
 Les résultats sont écrits dans `outputs/dataset/`. Les paramètres `output` et
 `diagnostics_output` de `config.json` définissent les destinations. Les sources
 et documents de référence restent dans leurs dossiers respectifs.
+
+## Rangement du 26 octobre 2026
+
+Le travail actif est `notebooks/03_modeles_reference.ipynb`, avec
+`outputs/dataset/` en entrée et `outputs/models/` pour le modèle et les règles.
+Le code applicatif reste dans `twin/`, `dashboard/` et `app.py`.
+
+Les anciennes tables placées directement dans `outputs/` et les anciennes
+baselines ont été déplacées dans `outputs/archives/avant-modelisation/`.
+Les diagnostics exploratoires sont regroupés dans `outputs/selection_batiment/`,
+avec les CSV par bâtiment dans `mensuel/`. La configuration des futurs diagnostics
+pointe vers ce nouveau dossier. Aucun fichier de données n'a été supprimé.
+
+Les chemins du dataset actif et du modèle restent identiques. Les fichiers
+`alert_rule.json` et `xgboost_forecast.joblib` sont des sorties générées locales,
+exclues de Git. Le plan des notebooks est décrit dans `notebooks/README.md`.
+
+## État après suppression des sorties facultatives
+
+Les anciennes sorties dans `outputs/archives/`, les diagnostics de sélection
+et les caches locaux ont été supprimés après le rangement ci-dessus.
+`outputs/` conserve le dataset complet, les modèles et son README local.
+Ces suppressions ne retirent aucun module de `twin/`.
+La commande `diagnose` recrée les diagnostics si nécessaire ; elle écrit désormais
+les CSV mensuels dans `outputs/selection_batiment/mensuel/`.
+
+## Extraction de l'entraînement
+
+`twin/training.py` centralise la préparation des variables, Ridge/XGBoost,
+l'évaluation, les résidus et la calibration. Le notebook 03 appelle ces fonctions
+et conserve la visualisation. L'entraînement autonome s'exécute avec
+`python -m twin.training` ; l'évaluation sur test est facultative
+(`--evaluate-test`). Le rejeu sera traité séparément.
